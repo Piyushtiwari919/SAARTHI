@@ -1,14 +1,28 @@
-export type EligibilityStatus = 'PASS' | 'FAIL' | 'NOT_VERIFIED';
+export type EligibilityStatus = 'PASS' | 'FAIL' | 'UNKNOWN' | 'NOT_VERIFIED';
 
-export type ComparisonOperator = '>=' | '<=' | '==' | '!=' | 'IN' | 'NOT_IN' | 'CONTAINS';
+export type ComparisonOperator =
+  | '>='
+  | '<='
+  | '=='
+  | '!='
+  | 'IN'
+  | 'NOT_IN'
+  | 'CONTAINS'
+  | 'EQ'
+  | 'NE'
+  | 'GT'
+  | 'GTE'
+  | 'LT'
+  | 'LTE';
 
 export interface EligibilityRequirement {
   id: string;
   field: string;
   fieldLabel: string;
   operator: ComparisonOperator;
-  expectedValue: string | number | boolean | string[];
-  actualValue?: string | number | boolean | string[] | null;
+  expectedValue: string | number | boolean | string[] | unknown;
+  actualValue?: string | number | boolean | string[] | null | unknown;
+  unit?: string;
   status: EligibilityStatus;
   explanation: string;
   sourceDocumentId?: string;

@@ -4,14 +4,13 @@ import type {
   DocumentStatus,
   DocumentUploadPayload,
   ExtractedAttribute,
-  ProcessingStep,
 } from '../types/document.ts';
 import { mockDocuments } from '../mocks/data/documents.mock.ts';
 
 type DocumentChangeListener = () => void;
 
 class DocumentService {
-  private documents: Document[] = [...mockDocuments];
+  private documents: Document[] = USE_MOCKS ? [...mockDocuments] : [];
   private listeners: Set<DocumentChangeListener> = new Set();
 
   public subscribe(listener: DocumentChangeListener): () => void {
@@ -107,42 +106,38 @@ class DocumentService {
         statusMessage: doc.statusMessage,
       };
     }
-    return ApiService.request<{
-      status: DocumentStatus;
-      progressPercent: number;
-      statusMessage?: string;
-    }>(`/api/documents/${id}/status`);
+    return ApiService.request<{ status: DocumentStatus; progressPercent: number; statusMessage?: string }>(
+      `/api/documents/${id}/status`
+    );
   }
 
   public async uploadDocument(payload: DocumentUploadPayload): Promise<Document> {
     if (USE_MOCKS) {
-      await simulateLatency(350); // Simulates fast 202 Accepted response
-
-      const now = new Date().toISOString();
-      const initialStep: ProcessingStep = {
-        status: 'UPLOADED',
-        label: 'Uploaded to private vault',
-        timestamp: now,
-        message: 'Stored in confidential student vault. Ingest job enqueued.',
-      };
+      await simulateLatency(400);
 
       const newDoc: Document = {
         id: `doc_${Date.now()}`,
-        userId: 'usr_sar_892341',
+        userId: 'usr_mock_01',
         fileName: payload.file.name,
-        customTitle: payload.customTitle || payload.file.name.replace(/\.[^/.]+$/, ''),
         fileSizeBytes: payload.file.size,
         mimeType: payload.file.type || 'application/pdf',
         category: payload.category,
+        customTitle: payload.customTitle,
         status: 'UPLOADED',
-        progressPercent: 10,
-        statusMessage: 'Stored in confidential vault; dispatching to BullMQ ingest queue',
+        progressPercent: 5,
+        statusMessage: 'Uploaded to private storage. Dispatching to ingestion queue...',
         isSensitive: payload.isSensitive ?? true,
-        pageCount: 1,
         extractedAttributes: [],
-        processingSteps: [initialStep],
-        createdAt: now,
-        updatedAt: now,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        processingSteps: [
+          {
+            status: 'UPLOADED',
+            label: 'Upload completed',
+            timestamp: new Date().toISOString(),
+            message: 'Securely uploaded to private storage',
+          },
+        ],
       };
 
       this.documents.unshift(newDoc);
@@ -154,9 +149,13 @@ class DocumentService {
       return newDoc;
     }
 
+    const docCategory =
+      payload.category === 'SCHOLARSHIP_DOCUMENT' ? 'SCHOLARSHIP_NOTICE' : payload.category;
+
     const formData = new FormData();
     formData.append('file', payload.file);
-    formData.append('category', payload.category);
+    formData.append('documentType', docCategory);
+    formData.append('category', docCategory);
     if (payload.customTitle) {
       formData.append('customTitle', payload.customTitle);
     }
@@ -164,11 +163,13 @@ class DocumentService {
       formData.append('isSensitive', String(payload.isSensitive));
     }
 
-    return ApiService.request<Document>('/api/documents/upload', {
+    const created = await ApiService.request<Document>('/api/documents/upload', {
       method: 'POST',
       body: formData,
-      headers: {},
     });
+
+    this.notifyListeners();
+    return created;
   }
 
   public async retryDocument(id: string): Promise<Document> {
@@ -214,6 +215,7 @@ class DocumentService {
       return true;
     }
     await ApiService.request<void>(`/api/documents/${id}`, { method: 'DELETE' });
+    this.notifyListeners();
     return true;
   }
 

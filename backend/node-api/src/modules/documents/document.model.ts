@@ -116,6 +116,7 @@ const DocumentSchema = new Schema<IDocumentRecord>(
       transform: (_doc, ret: Record<string, unknown>) => {
         ret.id = (ret._id as Types.ObjectId)?.toString();
         ret.userId = (ret.ownerId as Types.ObjectId)?.toString();
+        ret.category = ret.documentType;
         delete ret._id;
         delete ret.__v;
         delete ret.storageKey; // Never leak internal storage keys to the client

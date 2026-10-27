@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Compass, User, Mail, School, BookOpen, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Compass, User, Mail, School, BookOpen, ArrowRight, Lock } from 'lucide-react';
 import { Button } from '../../components/ui/Button.tsx';
 import { Input } from '../../components/ui/Input.tsx';
 import { Card } from '../../components/ui/Card.tsx';
@@ -14,6 +14,7 @@ export const SignupPage: React.FC = () => {
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('password123');
   const [institution, setInstitution] = useState('');
   const [course, setCourse] = useState('');
   const [agreeToPrivacy, setAgreeToPrivacy] = useState(true);
@@ -21,8 +22,13 @@ export const SignupPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fullName || !email || !institution || !course) {
-      toast.error('Please fill in all required academic fields');
+    if (!fullName || !email || !institution || !course || !password) {
+      toast.error('Please fill in all required academic fields and password');
+      return;
+    }
+
+    if (password.length < 8) {
+      toast.error('Password must be at least 8 characters long');
       return;
     }
 
@@ -36,14 +42,15 @@ export const SignupPage: React.FC = () => {
       await signup({
         fullName,
         email,
+        password,
         institution,
         course,
         agreeToPrivacy,
       });
       toast.success('Account created successfully', 'Welcome to Saarthi!');
       navigate('/app/dashboard');
-    } catch {
-      toast.error('Could not complete registration. Please try again.');
+    } catch (err: any) {
+      toast.error(err?.message || 'Could not complete registration. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -122,6 +129,16 @@ export const SignupPage: React.FC = () => {
           />
 
           <Input
+            label="Password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="At least 8 characters"
+            leftIcon={<Lock size={16} />}
+            required
+          />
+
+          <Input
             label="College / University Name"
             type="text"
             value={institution}
@@ -196,20 +213,6 @@ export const SignupPage: React.FC = () => {
           </Link>
         </div>
       </Card>
-
-      <div
-        style={{
-          marginTop: '24px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-          fontSize: 'var(--text-xs)',
-          color: 'var(--text-muted)',
-        }}
-      >
-        <ShieldCheck size={14} style={{ color: 'var(--brand-primary)' }} />
-        <span>Strict adherence to student privacy and academic data ethics</span>
-      </div>
     </div>
   );
 };
