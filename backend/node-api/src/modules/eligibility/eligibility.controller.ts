@@ -27,9 +27,19 @@ export class EligibilityController {
   ): Promise<void> {
     try {
       const userId = req.user!.id;
-      const oppId = Array.isArray(req.params.opportunityId)
+      const paramOppId = Array.isArray(req.params.opportunityId)
         ? req.params.opportunityId[0]
         : req.params.opportunityId;
+      const oppId = paramOppId || req.body.opportunityId;
+
+      if (!oppId) {
+        res.status(400).json({
+          success: false,
+          message: 'opportunityId is required in URL parameter or request body',
+        });
+        return;
+      }
+
       const { additionalEvidence } = req.body;
 
       const result = await eligibilityService.evaluateOpportunity(
@@ -37,6 +47,24 @@ export class EligibilityController {
         oppId,
         additionalEvidence
       );
+      res.status(200).json(result);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  public async getResultById(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const userId = req.user!.id;
+      const resultId = Array.isArray(req.params.resultId)
+        ? req.params.resultId[0]
+        : req.params.resultId;
+
+      const result = await eligibilityService.getResultById(userId, resultId);
       res.status(200).json(result);
     } catch (err) {
       next(err);

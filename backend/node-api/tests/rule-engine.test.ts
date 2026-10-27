@@ -7,66 +7,14 @@ import {
 } from '../src/modules/eligibility/rule-engine.js';
 import { OpportunityRule, UserEvidence } from '../src/modules/eligibility/eligibility.types.js';
 
-describe('Eligibility Rule Engine - 22 Comprehensive Test Cases', () => {
-  // -------------------------------------------------------------
-  // Section A: PASS Conditions (Cases 1-13)
-  // -------------------------------------------------------------
-
-  it('1. PASS: Numeric EQ comparison satisfies exact match', () => {
+describe('Eligibility Rule Engine - 22 Minimum Mandatory Test Cases (Section 12)', () => {
+  // 1. Numeric comparison returns PASS
+  it('1. Numeric comparison returns PASS when criterion is satisfied', () => {
     const rule: OpportunityRule = {
       ruleId: 'r1',
-      field: 'current_year',
-      operator: 'EQ',
-      expectedValue: 2,
-    };
-    const evidence: UserEvidence = {
-      field: 'current_year',
-      value: 2,
-      status: 'EXTRACTED',
-    };
-    const result = evaluateRule(rule, evidence);
-    expect(result.status).toBe('PASS');
-    expect(result.actualValue).toBe(2);
-  });
-
-  it('2. PASS: String EQ comparison satisfies case-insensitive trimmed match', () => {
-    const rule: OpportunityRule = {
-      ruleId: 'r2',
-      field: 'gender',
-      operator: 'EQ',
-      expectedValue: 'Female',
-    };
-    const evidence: UserEvidence = {
-      field: 'gender',
-      value: ' female ',
-      status: 'EXTRACTED',
-    };
-    const result = evaluateRule(rule, evidence);
-    expect(result.status).toBe('PASS');
-  });
-
-  it('3. PASS: NE comparison satisfies when values differ', () => {
-    const rule: OpportunityRule = {
-      ruleId: 'r3',
-      field: 'caste_category',
-      operator: 'NE',
-      expectedValue: 'GENERAL',
-    };
-    const evidence: UserEvidence = {
-      field: 'caste_category',
-      value: 'OBC',
-      status: 'EXTRACTED',
-    };
-    const result = evaluateRule(rule, evidence);
-    expect(result.status).toBe('PASS');
-  });
-
-  it('4. PASS: GT comparison satisfies when actual is strictly greater', () => {
-    const rule: OpportunityRule = {
-      ruleId: 'r4',
       field: 'percentage',
-      operator: 'GT',
-      expectedValue: 75,
+      operator: 'GTE',
+      expectedValue: 60,
     };
     const evidence: UserEvidence = {
       field: 'percentage',
@@ -75,258 +23,86 @@ describe('Eligibility Rule Engine - 22 Comprehensive Test Cases', () => {
     };
     const result = evaluateRule(rule, evidence);
     expect(result.status).toBe('PASS');
+    expect(result.actualValue).toBe(75.5);
   });
 
-  it('5. PASS: GTE comparison satisfies on exact boundary', () => {
+  // 2. Numeric comparison returns FAIL
+  it('2. Numeric comparison returns FAIL when criterion is not satisfied', () => {
     const rule: OpportunityRule = {
-      ruleId: 'r5',
-      field: 'percentage',
-      operator: 'GTE',
-      expectedValue: 60,
-    };
-    const evidence: UserEvidence = {
-      field: 'percentage',
-      value: 60,
-      status: 'EXTRACTED',
-    };
-    const result = evaluateRule(rule, evidence);
-    expect(result.status).toBe('PASS');
-  });
-
-  it('6. PASS: GTE comparison satisfies when strictly greater', () => {
-    const rule: OpportunityRule = {
-      ruleId: 'r6',
-      field: 'percentage',
-      operator: 'GTE',
-      expectedValue: 60,
-    };
-    const evidence: UserEvidence = {
-      field: 'percentage',
-      value: 85,
-      status: 'EXTRACTED',
-    };
-    const result = evaluateRule(rule, evidence);
-    expect(result.status).toBe('PASS');
-  });
-
-  it('7. PASS: LT comparison satisfies when actual is strictly lower', () => {
-    const rule: OpportunityRule = {
-      ruleId: 'r7',
-      field: 'annual_family_income',
-      operator: 'LT',
-      expectedValue: 500000,
-    };
-    const evidence: UserEvidence = {
-      field: 'annual_family_income',
-      value: 499999,
-      status: 'EXTRACTED',
-    };
-    const result = evaluateRule(rule, evidence);
-    expect(result.status).toBe('PASS');
-  });
-
-  it('8. PASS: LTE comparison satisfies on exact boundary', () => {
-    const rule: OpportunityRule = {
-      ruleId: 'r8',
-      field: 'annual_family_income',
-      operator: 'LTE',
-      expectedValue: 250000,
-      unit: 'INR',
-    };
-    const evidence: UserEvidence = {
-      field: 'annual_family_income',
-      value: 250000,
-      unit: 'INR',
-      status: 'EXTRACTED',
-    };
-    const result = evaluateRule(rule, evidence);
-    expect(result.status).toBe('PASS');
-  });
-
-  it('9. PASS: LTE comparison satisfies when strictly lower', () => {
-    const rule: OpportunityRule = {
-      ruleId: 'r9',
+      ruleId: 'r2',
       field: 'annual_family_income',
       operator: 'LTE',
       expectedValue: 250000,
     };
     const evidence: UserEvidence = {
       field: 'annual_family_income',
-      value: 120000,
-      status: 'EXTRACTED',
-    };
-    const result = evaluateRule(rule, evidence);
-    expect(result.status).toBe('PASS');
-  });
-
-  it('10. PASS: IN comparison satisfies when actual exists in array', () => {
-    const rule: OpportunityRule = {
-      ruleId: 'r10',
-      field: 'state',
-      operator: 'IN',
-      expectedValue: ['Maharashtra', 'Gujarat', 'Karnataka'],
-    };
-    const evidence: UserEvidence = {
-      field: 'state',
-      value: 'maharashtra',
-      status: 'EXTRACTED',
-    };
-    const result = evaluateRule(rule, evidence);
-    expect(result.status).toBe('PASS');
-  });
-
-  it('11. PASS: NOT_IN comparison satisfies when actual is not in array', () => {
-    const rule: OpportunityRule = {
-      ruleId: 'r11',
-      field: 'state',
-      operator: 'NOT_IN',
-      expectedValue: ['Delhi', 'Punjab'],
-    };
-    const evidence: UserEvidence = {
-      field: 'state',
-      value: 'Maharashtra',
-      status: 'EXTRACTED',
-    };
-    const result = evaluateRule(rule, evidence);
-    expect(result.status).toBe('PASS');
-  });
-
-  it('12. PASS: Standard operator aliases (==, !=, >=, <=) resolve correctly', () => {
-    expect(normalizeOperator('==')).toBe('EQ');
-    expect(normalizeOperator('!=')).toBe('NE');
-    expect(normalizeOperator('>=')).toBe('GTE');
-    expect(normalizeOperator('<=')).toBe('LTE');
-
-    const rule: OpportunityRule = {
-      ruleId: 'r12',
-      field: 'percentage',
-      operator: '>=',
-      expectedValue: 70,
-    };
-    const evidence: UserEvidence = {
-      field: 'percentage',
-      value: 75,
-      status: 'EXTRACTED',
-    };
-    const result = evaluateRule(rule, evidence);
-    expect(result.status).toBe('PASS');
-    expect(result.operator).toBe('GTE');
-  });
-
-  it('13. PASS: Canonical field name aliases are mapped properly', () => {
-    expect(normalizeFieldName('annual_income')).toBe('annual_family_income');
-    expect(normalizeFieldName('family-income')).toBe('annual_family_income');
-    expect(normalizeFieldName('minimum_marks')).toBe('percentage');
-    expect(normalizeFieldName('domicile_state')).toBe('state');
-
-    const rule: OpportunityRule = {
-      ruleId: 'r13',
-      field: 'annual_income',
-      operator: 'LTE',
-      expectedValue: 300000,
-    };
-    const result = aggregateEvaluation(
-      'opp1',
-      [rule],
-      [{ field: 'annual_family_income', value: 200000, status: 'EXTRACTED' }]
-    );
-    expect(result.overallStatus).toBe('PASS');
-  });
-
-  // -------------------------------------------------------------
-  // Section B: FAIL Conditions (Cases 14-17)
-  // -------------------------------------------------------------
-
-  it('14. FAIL: GTE comparison fails when actual is below threshold', () => {
-    const rule: OpportunityRule = {
-      ruleId: 'r14',
-      field: 'percentage',
-      operator: 'GTE',
-      expectedValue: 80,
-    };
-    const evidence: UserEvidence = {
-      field: 'percentage',
-      value: 78.4,
+      value: 300000,
       status: 'EXTRACTED',
     };
     const result = evaluateRule(rule, evidence);
     expect(result.status).toBe('FAIL');
+    expect(result.actualValue).toBe(300000);
   });
 
-  it('15. FAIL: LTE comparison fails when actual exceeds ceiling', () => {
+  // 3. Missing field returns UNKNOWN
+  it('3. Missing field returns UNKNOWN with clear explanatory message', () => {
     const rule: OpportunityRule = {
-      ruleId: 'r15',
+      ruleId: 'r3',
+      field: 'caste_category',
+      operator: 'EQ',
+      expectedValue: 'OBC',
+    };
+    const result = evaluateRule(rule, undefined);
+    expect(result.status).toBe('UNKNOWN');
+    expect(result.reason).toContain('No usable evidence found for required field');
+  });
+
+  // 4. Null value returns UNKNOWN
+  it('4. Null value in evidence returns UNKNOWN (never coerces null to zero)', () => {
+    const rule: OpportunityRule = {
+      ruleId: 'r4',
       field: 'annual_family_income',
+      operator: 'LTE',
+      expectedValue: 250000,
+    };
+    const evidence: UserEvidence = {
+      field: 'annual_family_income',
+      value: null,
+      status: 'EXTRACTED',
+    };
+    const result = evaluateRule(rule, evidence);
+    expect(result.status).toBe('UNKNOWN');
+    expect(result.actualValue).toBeNull();
+  });
+
+  // 5. NOT_FOUND extraction status returns UNKNOWN
+  it('5. NOT_FOUND extraction status returns UNKNOWN', () => {
+    const rule: OpportunityRule = {
+      ruleId: 'r5',
+      field: 'gross_annual_income',
       operator: 'LTE',
       expectedValue: 200000,
     };
     const evidence: UserEvidence = {
-      field: 'annual_family_income',
-      value: 200001,
-      status: 'EXTRACTED',
+      field: 'gross_annual_income',
+      value: undefined,
+      status: 'NOT_FOUND',
     };
     const result = evaluateRule(rule, evidence);
-    expect(result.status).toBe('FAIL');
-  });
-
-  it('16. FAIL: EQ fails on string mismatch', () => {
-    const rule: OpportunityRule = {
-      ruleId: 'r16',
-      field: 'gender',
-      operator: 'EQ',
-      expectedValue: 'Female',
-    };
-    const evidence: UserEvidence = {
-      field: 'gender',
-      value: 'Male',
-      status: 'EXTRACTED',
-    };
-    const result = evaluateRule(rule, evidence);
-    expect(result.status).toBe('FAIL');
-  });
-
-  it('17. FAIL: NOT_IN fails when value is present in disallowed list', () => {
-    const rule: OpportunityRule = {
-      ruleId: 'r17',
-      field: 'state',
-      operator: 'NOT_IN',
-      expectedValue: ['Goa', 'Sikkim'],
-    };
-    const evidence: UserEvidence = {
-      field: 'state',
-      value: 'Goa',
-      status: 'EXTRACTED',
-    };
-    const result = evaluateRule(rule, evidence);
-    expect(result.status).toBe('FAIL');
-  });
-
-  // -------------------------------------------------------------
-  // Section C: UNKNOWN Conditions (Cases 18-22)
-  // -------------------------------------------------------------
-
-  it('18. UNKNOWN: Missing evidence returns UNKNOWN status with clear explanation', () => {
-    const rule: OpportunityRule = {
-      ruleId: 'r18',
-      field: 'family_income',
-      operator: 'LTE',
-      expectedValue: 250000,
-    };
-    const result = evaluateRule(rule, undefined);
     expect(result.status).toBe('UNKNOWN');
-    expect(result.reason).toContain('No usable evidence found');
   });
 
-  it('19. UNKNOWN: Evidence flagged as NEEDS_REVIEW (ambiguous date / uncertain OCR)', () => {
+  // 6. NEEDS_REVIEW extraction status returns UNKNOWN
+  it('6. NEEDS_REVIEW extraction status returns UNKNOWN rather than guessing', () => {
     const rule: OpportunityRule = {
-      ruleId: 'r19',
-      field: 'issue_date',
+      ruleId: 'r6',
+      field: 'certificate_issue_date',
       operator: 'GTE',
-      expectedValue: '2025-01-01',
+      expectedValue: '2024-04-01',
     };
     const evidence: UserEvidence = {
-      field: 'issue_date',
-      value: '05/06/2025',
+      field: 'certificate_issue_date',
+      value: '2024-04-10',
       status: 'NEEDS_REVIEW',
     };
     const result = evaluateRule(rule, evidence);
@@ -334,9 +110,46 @@ describe('Eligibility Rule Engine - 22 Comprehensive Test Cases', () => {
     expect(result.reason).toContain('flagged for review');
   });
 
-  it('20. UNKNOWN: Unit mismatch flags review instead of false PASS/FAIL', () => {
+  // 7. Unsupported operator returns UNKNOWN or a documented validation error
+  it('7. Unsupported operator returns UNKNOWN without crashing', () => {
     const rule: OpportunityRule = {
-      ruleId: 'r20',
+      ruleId: 'r7',
+      field: 'percentage',
+      operator: 'UNKNOWN_OP' as any,
+      expectedValue: 80,
+    };
+    const evidence: UserEvidence = {
+      field: 'percentage',
+      value: 85,
+      status: 'EXTRACTED',
+    };
+    const result = evaluateRule(rule, evidence);
+    expect(result.status).toBe('UNKNOWN');
+    expect(result.reason).toContain('Unsupported rule operator');
+  });
+
+  // 8. Numeric type mismatch is handled safely
+  it('8. Numeric type mismatch is handled safely (non-numeric string returns UNKNOWN)', () => {
+    const rule: OpportunityRule = {
+      ruleId: 'r8',
+      field: 'annual_family_income',
+      operator: 'LTE',
+      expectedValue: 300000,
+    };
+    const evidence: UserEvidence = {
+      field: 'annual_family_income',
+      value: 'three_lakhs_rupees',
+      status: 'EXTRACTED',
+    };
+    const result = evaluateRule(rule, evidence);
+    expect(result.status).toBe('UNKNOWN');
+    expect(result.reason).toContain('requires valid numbers');
+  });
+
+  // 9. Unit mismatch returns UNKNOWN
+  it('9. Unit mismatch returns UNKNOWN (e.g. INR vs USD, or % vs CGPA)', () => {
+    const rule: OpportunityRule = {
+      ruleId: 'r9',
       field: 'annual_family_income',
       operator: 'LTE',
       expectedValue: 5000,
@@ -351,95 +164,258 @@ describe('Eligibility Rule Engine - 22 Comprehensive Test Cases', () => {
     const result = evaluateRule(rule, evidence);
     expect(result.status).toBe('UNKNOWN');
     expect(result.reason).toContain('Unit mismatch');
-  });
 
-  it('21. UNKNOWN: Conflicting evidence across documents flags UNKNOWN for human review', () => {
-    const rule: OpportunityRule = {
-      ruleId: 'r21',
-      field: 'annual_family_income',
-      operator: 'LTE',
-      expectedValue: 250000,
-    };
-    const evidence1: UserEvidence = {
-      field: 'annual_family_income',
-      value: 180000,
-      sourceDocumentId: 'doc1',
-      status: 'EXTRACTED',
-    };
-    const evidence2: UserEvidence = {
-      field: 'annual_family_income',
-      value: 320000,
-      sourceDocumentId: 'doc2',
-      status: 'EXTRACTED',
-    };
-    const result = evaluateRule(rule, [evidence1, evidence2]);
-    expect(result.status).toBe('UNKNOWN');
-    expect(result.reason).toContain('Conflicting evidence detected');
-  });
-
-  it('22. UNKNOWN: Invalid operator or non-numeric comparison handles gracefully', () => {
-    const rule: OpportunityRule = {
-      ruleId: 'r22',
+    // Also CGPA vs percentage conversion guard
+    const cgpaRule: OpportunityRule = {
+      ruleId: 'r9_cgpa',
       field: 'percentage',
-      operator: 'INVALID_OP' as any,
-      expectedValue: 80,
+      operator: 'GTE',
+      expectedValue: 75,
+      unit: '%',
+    };
+    const cgpaEvidence: UserEvidence = {
+      field: 'percentage',
+      value: 8.2,
+      unit: 'CGPA',
+      status: 'EXTRACTED',
+    };
+    const cgpaResult = evaluateRule(cgpaRule, cgpaEvidence);
+    expect(cgpaResult.status).toBe('UNKNOWN');
+    expect(cgpaResult.reason).toContain('Cannot convert between CGPA and percentage');
+  });
+
+  // 10. Date comparison handles normalized ISO dates
+  it('10. Date comparison handles normalized ISO dates (YYYY-MM-DD)', () => {
+    const rule: OpportunityRule = {
+      ruleId: 'r10',
+      field: 'issue_date',
+      operator: 'GTE',
+      expectedValue: '2024-01-01',
+    };
+    const evidencePass: UserEvidence = {
+      field: 'issue_date',
+      value: '2024-05-15',
+      status: 'EXTRACTED',
+    };
+    const resPass = evaluateRule(rule, evidencePass);
+    expect(resPass.status).toBe('PASS');
+
+    const evidenceFail: UserEvidence = {
+      field: 'issue_date',
+      value: '2023-12-31',
+      status: 'EXTRACTED',
+    };
+    const resFail = evaluateRule(rule, evidenceFail);
+    expect(resFail.status).toBe('FAIL');
+  });
+
+  // 11. Ambiguous dates return UNKNOWN
+  it('11. Ambiguous dates return UNKNOWN (e.g. 05/06/2025 with unclear day/month)', () => {
+    const rule: OpportunityRule = {
+      ruleId: 'r11',
+      field: 'issue_date',
+      operator: 'GTE',
+      expectedValue: '2025-01-01',
     };
     const evidence: UserEvidence = {
-      field: 'percentage',
-      value: 85,
+      field: 'issue_date',
+      value: '05/06/2025', // Slash formatted date is ambiguous
       status: 'EXTRACTED',
     };
     const result = evaluateRule(rule, evidence);
     expect(result.status).toBe('UNKNOWN');
-    expect(result.reason).toContain('Unsupported rule operator');
+    expect(result.reason).toContain('Ambiguous date format detected');
   });
 
-  // -------------------------------------------------------------
-  // Section D: Multi-Rule Aggregation Logic
-  // -------------------------------------------------------------
+  // 12. EQ string comparison follows documented normalization policy
+  it('12. EQ string comparison follows documented normalization policy (case-insensitive & trimmed)', () => {
+    const rule: OpportunityRule = {
+      ruleId: 'r12',
+      field: 'state',
+      operator: 'EQ',
+      expectedValue: 'Maharashtra',
+    };
+    const evidence: UserEvidence = {
+      field: 'state',
+      value: '  maharashtra  ',
+      status: 'EXTRACTED',
+    };
+    const result = evaluateRule(rule, evidence);
+    expect(result.status).toBe('PASS');
 
-  it('Aggregates to FAIL if any required rule fails, even if others pass', () => {
+    const evidenceMismatch: UserEvidence = {
+      field: 'state',
+      value: 'Gujarat',
+      status: 'EXTRACTED',
+    };
+    expect(evaluateRule(rule, evidenceMismatch).status).toBe('FAIL');
+  });
+
+  // 13. IN works with a valid list operand
+  it('13. IN works with a valid list operand', () => {
+    const rule: OpportunityRule = {
+      ruleId: 'r13',
+      field: 'caste_category',
+      operator: 'IN',
+      expectedValue: ['SC', 'ST', 'OBC', 'EWS'],
+    };
+    const evidence: UserEvidence = {
+      field: 'caste_category',
+      value: 'OBC',
+      status: 'EXTRACTED',
+    };
+    const result = evaluateRule(rule, evidence);
+    expect(result.status).toBe('PASS');
+  });
+
+  // 14. NOT_IN works with a valid list operand
+  it('14. NOT_IN works with a valid list operand', () => {
+    const rule: OpportunityRule = {
+      ruleId: 'r14',
+      field: 'state',
+      operator: 'NOT_IN',
+      expectedValue: ['Goa', 'Sikkim'],
+    };
+    const evidence: UserEvidence = {
+      field: 'state',
+      value: 'Karnataka',
+      status: 'EXTRACTED',
+    };
+    const result = evaluateRule(rule, evidence);
+    expect(result.status).toBe('PASS');
+
+    const failEvidence: UserEvidence = {
+      field: 'state',
+      value: 'Goa',
+      status: 'EXTRACTED',
+    };
+    expect(evaluateRule(rule, failEvidence).status).toBe('FAIL');
+  });
+
+  // 15. Malformed rules cannot execute arbitrary expressions
+  it('15. Malformed rules cannot execute arbitrary expressions (pure evaluation, no eval)', () => {
+    const rule: OpportunityRule = {
+      ruleId: 'r15',
+      field: 'percentage',
+      operator: 'EQ',
+      expectedValue: "process.exit(1) || 90; require('fs')",
+    };
+    const evidence: UserEvidence = {
+      field: 'percentage',
+      value: 90,
+      status: 'EXTRACTED',
+    };
+    // Evaluates safely as a literal string equality without invoking eval or code execution
+    const result = evaluateRule(rule, evidence);
+    expect(result.status).toBe('FAIL');
+  });
+
+  // 16. Conflicting evidence returns UNKNOWN
+  it('16. Conflicting evidence across documents returns UNKNOWN for human review', () => {
+    const rule: OpportunityRule = {
+      ruleId: 'r16',
+      field: 'annual_family_income',
+      operator: 'LTE',
+      expectedValue: 250000,
+    };
+    const doc1Evidence: UserEvidence = {
+      field: 'annual_family_income',
+      value: 180000,
+      sourceDocumentId: 'doc_1',
+      status: 'EXTRACTED',
+    };
+    const doc2Evidence: UserEvidence = {
+      field: 'annual_family_income',
+      value: 350000,
+      sourceDocumentId: 'doc_2',
+      status: 'EXTRACTED',
+    };
+    const result = evaluateRule(rule, [doc1Evidence, doc2Evidence]);
+    expect(result.status).toBe('UNKNOWN');
+    expect(result.reason).toContain('Conflicting evidence detected across multiple documents');
+  });
+
+  // 17. Missing source evidence is handled according to the documented policy
+  it('17. Missing source evidence is handled according to policy (returns UNKNOWN)', () => {
+    const rule: OpportunityRule = {
+      ruleId: 'r17',
+      field: 'bonafide_status',
+      operator: 'EQ',
+      expectedValue: 'Active',
+    };
+    const result = evaluateRule(rule, []);
+    expect(result.status).toBe('UNKNOWN');
+    expect(result.reason).toContain('No usable evidence found');
+  });
+
+  // 18. Overall aggregation returns PASS when all required rules pass
+  it('18. Overall aggregation returns PASS when all required rules pass', () => {
     const rules: OpportunityRule[] = [
-      { ruleId: 'r1', field: 'percentage', operator: 'GTE', expectedValue: 80, required: true },
-      { ruleId: 'r2', field: 'annual_family_income', operator: 'LTE', expectedValue: 200000, required: true },
+      { ruleId: 'r18_1', field: 'percentage', operator: 'GTE', expectedValue: 75, required: true },
+      { ruleId: 'r18_2', field: 'annual_family_income', operator: 'LTE', expectedValue: 500000, required: true },
+    ];
+    const evidence: UserEvidence[] = [
+      { field: 'percentage', value: 82, status: 'EXTRACTED' },
+      { field: 'annual_family_income', value: 240000, status: 'EXTRACTED' },
+    ];
+    const result = aggregateEvaluation('opp_18', rules, evidence);
+    expect(result.overallStatus).toBe('PASS');
+    expect(result.summary).toContain('All evaluated eligibility criteria have been satisfied');
+  });
+
+  // 19. Overall aggregation returns FAIL when a required, usable rule fails
+  it('19. Overall aggregation returns FAIL when a required, usable rule fails', () => {
+    const rules: OpportunityRule[] = [
+      { ruleId: 'r19_1', field: 'percentage', operator: 'GTE', expectedValue: 80, required: true },
+      { ruleId: 'r19_2', field: 'annual_family_income', operator: 'LTE', expectedValue: 200000, required: true },
     ];
     const evidence: UserEvidence[] = [
       { field: 'percentage', value: 85, status: 'EXTRACTED' }, // PASS
-      { field: 'annual_family_income', value: 300000, status: 'EXTRACTED' }, // FAIL
+      { field: 'annual_family_income', value: 250000, status: 'EXTRACTED' }, // FAIL
     ];
-    const result = aggregateEvaluation('opp1', rules, evidence);
+    const result = aggregateEvaluation('opp_19', rules, evidence);
     expect(result.overallStatus).toBe('FAIL');
     expect(result.summary).toContain('does not meet one or more mandatory eligibility requirements');
   });
 
-  it('Aggregates to UNKNOWN if no rules fail, but at least one required rule is missing/unknown', () => {
+  // 20. Overall aggregation returns UNKNOWN when required evidence is incomplete
+  it('20. Overall aggregation returns UNKNOWN when required evidence is incomplete', () => {
     const rules: OpportunityRule[] = [
-      { ruleId: 'r1', field: 'percentage', operator: 'GTE', expectedValue: 80, required: true },
-      { ruleId: 'r2', field: 'state', operator: 'EQ', expectedValue: 'Maharashtra', required: true },
+      { ruleId: 'r20_1', field: 'percentage', operator: 'GTE', expectedValue: 80, required: true },
+      { ruleId: 'r20_2', field: 'state', operator: 'EQ', expectedValue: 'Maharashtra', required: true },
     ];
     const evidence: UserEvidence[] = [
-      { field: 'percentage', value: 85, status: 'EXTRACTED' }, // PASS
-      // state evidence is missing
+      { field: 'percentage', value: 85, status: 'EXTRACTED' },
+      // State is missing
     ];
-    const result = aggregateEvaluation('opp1', rules, evidence);
+    const result = aggregateEvaluation('opp_20', rules, evidence);
     expect(result.overallStatus).toBe('UNKNOWN');
-    expect(result.summary).toContain('Missing or unverified evidence');
+    expect(result.summary).toContain('Eligibility could not be conclusively determined');
   });
 
-  it('Aggregates to PASS when all required rules pass', () => {
-    const rules: OpportunityRule[] = [
-      { ruleId: 'r1', field: 'percentage', operator: 'GTE', expectedValue: 80, required: true },
-      { ruleId: 'r2', field: 'annual_family_income', operator: 'LTE', expectedValue: 400000, required: true },
-      { ruleId: 'r3', field: 'state', operator: 'EQ', expectedValue: 'Maharashtra', required: true },
-    ];
-    const evidence: UserEvidence[] = [
-      { field: 'percentage', value: 92, status: 'EXTRACTED' },
-      { field: 'annual_family_income', value: 180000, status: 'EXTRACTED' },
-      { field: 'state', value: 'Maharashtra', status: 'EXTRACTED' },
-    ];
-    const result = aggregateEvaluation('opp1', rules, evidence);
-    expect(result.overallStatus).toBe('PASS');
-    expect(result.summary).toContain('All evaluated eligibility criteria have been satisfied');
+  // 21. Overall aggregation returns UNKNOWN when no usable rules exist
+  it('21. Overall aggregation returns UNKNOWN when no usable rules exist', () => {
+    const result = aggregateEvaluation('opp_empty', [], []);
+    expect(result.overallStatus).toBe('UNKNOWN');
+    expect(result.summary).toContain('No eligibility criteria or requirements are defined');
+  });
+
+  // 22. An invalid or unapproved extracted requirement does not generate a false result
+  it('22. An unapproved extracted requirement (NEEDS_REVIEW) does not generate a false result', () => {
+    const rule: OpportunityRule = {
+      ruleId: 'r22',
+      field: 'annual_family_income',
+      operator: 'LTE',
+      expectedValue: 250000,
+      extractionStatus: 'NEEDS_REVIEW', // Unverified rule extraction
+    };
+    const evidence: UserEvidence = {
+      field: 'annual_family_income',
+      value: 150000, // Would otherwise pass
+      status: 'EXTRACTED',
+    };
+    const result = evaluateRule(rule, evidence);
+    expect(result.status).toBe('UNKNOWN');
+    expect(result.reason).toContain('requires manual review');
   });
 });
-

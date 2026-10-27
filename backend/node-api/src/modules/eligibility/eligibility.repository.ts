@@ -289,6 +289,13 @@ export class EligibilityRepository {
       opportunityId,
     });
   }
+
+  public async getResultById(resultId: string): Promise<IEligibilityResultRecord | null> {
+    if (Types.ObjectId.isValid(resultId)) {
+      return EligibilityResultModel.findById(resultId);
+    }
+    return null;
+  }
 }
 
 export const eligibilityRepository = new EligibilityRepository();

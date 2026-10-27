@@ -190,6 +190,44 @@ export class EligibilityService {
     return this.evaluateOpportunity(userId, opportunityId);
   }
 
+  public async getResultById(userId: string, resultId: string): Promise<FormattedEligibilityResponse> {
+    const result = await this.repo.getResultById(resultId);
+    if (!result) {
+      throw new AppError(`Eligibility evaluation result not found: ${resultId}`, 404);
+    }
+
+    // Strict multi-tenant isolation: prevent user B from seeing user A's result
+    if (result.userId.toString() !== userId) {
+      throw new AppError('Forbidden: Access denied to this evaluation result', 403);
+    }
+
+    return {
+      opportunityId: result.opportunityId,
+      opportunityTitle: result.opportunityTitle,
+      overallStatus: result.overallStatus,
+      confidenceScore: result.confidenceScore,
+      evaluatedAt: result.evaluatedAt.toISOString(),
+      summary: result.summary,
+      requirements: result.requirements.map((r) => ({
+        id: r.ruleId,
+        field: r.field,
+        fieldLabel: r.field.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+        operator: r.operator,
+        expectedValue: r.expectedValue,
+        actualValue: r.actualValue,
+        unit: r.unit,
+        status: r.status,
+        explanation: r.reason,
+        sourceDocumentId: r.evidence?.documentId || r.source?.documentId,
+        sourcePage: r.evidence?.page || r.source?.page,
+        evidenceSnippet: r.evidence?.evidenceSnippet || r.source?.evidenceSnippet,
+        isMandatory: true,
+      })),
+      missingDocuments: result.missingDocuments,
+      actionItems: result.actionItems,
+    };
+  }
+
   public async getAllEligibilitySummaries(userId: string): Promise<FormattedEligibilityResponse[]> {
     const opportunities = await this.repo.getAllActiveOpportunities();
     const results: FormattedEligibilityResponse[] = [];

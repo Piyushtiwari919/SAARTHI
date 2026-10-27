@@ -99,7 +99,15 @@ export function evaluateRule(
     };
   }
 
-  // 2. Validate rule extraction reliability
+  // 2. Validate rule extraction reliability & completeness
+  if (rule.expectedValue === undefined || rule.expectedValue === null) {
+    return {
+      ...baseResult,
+      status: 'UNKNOWN',
+      reason: `Rule expectation is null or undefined for field '${rule.field}'.`,
+    };
+  }
+
   if (rule.extractionStatus === 'NEEDS_REVIEW' || rule.extractionStatus === 'NOT_FOUND') {
     return {
       ...baseResult,
@@ -166,7 +174,21 @@ export function evaluateRule(
 
   // 6. Unit & Currency compatibility check
   if (rule.unit && primaryEvidence.unit) {
-    if (rule.unit.trim().toUpperCase() !== primaryEvidence.unit.trim().toUpperCase()) {
+    const normRuleUnit = rule.unit.trim().toUpperCase();
+    const normEvUnit = primaryEvidence.unit.trim().toUpperCase();
+
+    if (
+      (normRuleUnit === '%' && normEvUnit === 'CGPA') ||
+      (normRuleUnit === 'CGPA' && normEvUnit === '%')
+    ) {
+      return {
+        ...baseResult,
+        status: 'UNKNOWN',
+        reason: `Cannot convert between CGPA and percentage without a specified institution conversion formula.`,
+      };
+    }
+
+    if (normRuleUnit !== normEvUnit) {
       return {
         ...baseResult,
         status: 'UNKNOWN',
@@ -179,14 +201,102 @@ export function evaluateRule(
   return executeOperatorComparison(canonicalOp, rule.expectedValue, actualValue, baseResult);
 }
 
+const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:?\d{2})?)?$/;
+const AMBIGUOUS_DATE_PATTERN = /^(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})|(\d{4}[/]\d{1,2}[/]\d{1,2})$/;
+
 function executeOperatorComparison(
   op: CanonicalOperator,
   expected: unknown,
   actual: unknown,
   context: RequirementResult
 ): RequirementResult {
+  // Date comparisons check
+  if (typeof expected === 'string' && typeof actual === 'string') {
+    const expTrim = expected.trim();
+    const actTrim = actual.trim();
+
+    const isActualAmbiguous = AMBIGUOUS_DATE_PATTERN.test(actTrim) && !ISO_DATE_PATTERN.test(actTrim);
+    const isExpectedAmbiguous = AMBIGUOUS_DATE_PATTERN.test(expTrim) && !ISO_DATE_PATTERN.test(expTrim);
+
+    if (isActualAmbiguous || isExpectedAmbiguous) {
+      return {
+        ...context,
+        status: 'UNKNOWN',
+        reason: `Ambiguous date format detected ('${isActualAmbiguous ? actual : expected}'). Date comparisons require unambiguous ISO 8601 dates (YYYY-MM-DD).`,
+      };
+    }
+
+    const isActualIso = ISO_DATE_PATTERN.test(actTrim);
+    const isExpectedIso = ISO_DATE_PATTERN.test(expTrim);
+
+    if (isActualIso && isExpectedIso) {
+      const timeActual = Date.parse(actTrim);
+      const timeExpected = Date.parse(expTrim);
+
+      if (isNaN(timeActual) || isNaN(timeExpected)) {
+        return {
+          ...context,
+          status: 'UNKNOWN',
+          reason: `Invalid calendar date in ISO date string. Got expected='${expected}', actual='${actual}'.`,
+        };
+      }
+
+      let pass = false;
+      switch (op) {
+        case 'GT':
+          pass = timeActual > timeExpected;
+          break;
+        case 'GTE':
+          pass = timeActual >= timeExpected;
+          break;
+        case 'LT':
+          pass = timeActual < timeExpected;
+          break;
+        case 'LTE':
+          pass = timeActual <= timeExpected;
+          break;
+        case 'EQ':
+          pass = timeActual === timeExpected;
+          break;
+        case 'NE':
+          pass = timeActual !== timeExpected;
+          break;
+        default:
+          return {
+            ...context,
+            status: 'UNKNOWN',
+            reason: `Operator '${op}' is not supported for date comparisons.`,
+          };
+      }
+
+      return {
+        ...context,
+        status: pass ? 'PASS' : 'FAIL',
+        reason: pass
+          ? `Date '${actual}' satisfies condition: ${op} '${expected}'.`
+          : `Date '${actual}' does not satisfy condition: ${op} '${expected}'.`,
+      };
+    }
+  }
+
   // Numeric comparisons: GT, GTE, LT, LTE
   if (op === 'GT' || op === 'GTE' || op === 'LT' || op === 'LTE') {
+    // Explicitly prevent null, boolean, or empty string from coercing to 0
+    if (
+      expected === null ||
+      actual === null ||
+      expected === '' ||
+      actual === '' ||
+      typeof expected === 'boolean' ||
+      typeof actual === 'boolean'
+    ) {
+      return {
+        ...context,
+        status: 'UNKNOWN',
+        reason: `Numeric comparison operator '${op}' cannot compare null, boolean, or empty values.`,
+      };
+    }
+
     const numExpected = Number(expected);
     const numActual = Number(actual);
 
@@ -251,18 +361,26 @@ function executeOperatorComparison(
   if (op === 'EQ' || op === 'NE') {
     let equal = false;
 
-    // Check if both are numbers
-    const numExp = Number(expected);
-    const numAct = Number(actual);
-    if (!isNaN(numExp) && !isNaN(numAct) && typeof expected !== 'boolean' && typeof actual !== 'boolean') {
-      equal = numExp === numAct;
+    if (
+      expected !== null &&
+      actual !== null &&
+      expected !== '' &&
+      actual !== '' &&
+      typeof expected !== 'boolean' &&
+      typeof actual !== 'boolean'
+    ) {
+      const numExp = Number(expected);
+      const numAct = Number(actual);
+      if (!isNaN(numExp) && !isNaN(numAct)) {
+        equal = numExp === numAct;
+      } else {
+        // Conservative string normalization: trim and lowercase
+        equal = String(expected).trim().toLowerCase() === String(actual).trim().toLowerCase();
+      }
     } else if (typeof expected === 'boolean' || typeof actual === 'boolean') {
       equal = Boolean(expected) === Boolean(actual);
     } else {
-      // Conservative string normalization: trim and lowercase
-      const strExp = String(expected).trim().toLowerCase();
-      const strAct = String(actual).trim().toLowerCase();
-      equal = strExp === strAct;
+      equal = expected === actual;
     }
 
     const pass = op === 'EQ' ? equal : !equal;
