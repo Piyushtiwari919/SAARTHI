@@ -9,6 +9,7 @@ import { authRoutes } from './modules/auth/auth.routes.js';
 import { documentRoutes } from './modules/documents/document.routes.js';
 import { eligibilityRouter } from './modules/eligibility/eligibility.routes.js';
 import { opportunityRouter } from './modules/eligibility/opportunity.routes.js';
+import { assistantRouter } from './modules/assistant/assistant.routes.js';
 
 export function createApp(): Express {
   const app = express();
@@ -52,17 +53,19 @@ export function createApp(): Express {
   app.get('/api/v1/health', healthCheckHandler);
   app.get('/api/health', healthCheckHandler);
 
-  // 5. Versioned API Routes (Day 1-2 API contract)
+  // 5. Versioned API Routes
   app.use('/api/v1/auth', authRoutes);
   app.use('/api/v1/documents', documentRoutes);
   app.use('/api/v1/eligibility', eligibilityRouter);
   app.use('/api/v1/opportunities', opportunityRouter);
+  app.use('/api/v1/assistant', assistantRouter);
 
   // 6. Direct /api/ aliases (Frontend service compatibility)
   app.use('/api/auth', authRoutes);
   app.use('/api/documents', documentRoutes);
   app.use('/api/eligibility', eligibilityRouter);
   app.use('/api/opportunities', opportunityRouter);
+  app.use('/api/assistant', assistantRouter);
 
   // 7. 404 Route Handler
   app.use((req: Request, _res: Response, next: NextFunction) => {
@@ -76,4 +79,3 @@ export function createApp(): Express {
 }
 
 export const app = createApp();
-
