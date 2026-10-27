@@ -92,7 +92,7 @@ export const AssistantPage: React.FC = () => {
     }
 
     const userMsg: AssistantMessage = {
-      id: 'usr_' + Math.random().toString(36).slice(2, 9),
+      id: 'usr_' + crypto.randomUUID(),
       role: 'user',
       content: q,
       timestamp: new Date().toISOString(),
@@ -112,7 +112,7 @@ export const AssistantPage: React.FC = () => {
       });
 
       const botMsg: AssistantMessage = {
-        id: 'ast_' + Math.random().toString(36).slice(2, 9),
+        id: 'ast_' + crypto.randomUUID(),
         role: 'assistant',
         content: response.answer,
         status: response.status,
@@ -125,7 +125,7 @@ export const AssistantPage: React.FC = () => {
     } catch (err: any) {
       console.error('RAG query error:', err);
       const errorMsg: AssistantMessage = {
-        id: 'ast_err_' + Math.random().toString(36).slice(2, 9),
+        id: 'ast_err_' + crypto.randomUUID(),
         role: 'assistant',
         content:
           err?.message ||

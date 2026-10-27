@@ -23,6 +23,14 @@ describe('API Contract & Route Integration Tests', () => {
       expect(res.status).toBe(200);
       expect(res.body.status).toBe('UP');
     });
+
+    it('GET /health/ready returns readiness check with component breakdown', async () => {
+      const res = await request(app).get('/health/ready');
+      expect([200, 503]).toContain(res.status);
+      expect(res.body.checks).toBeDefined();
+      expect(res.body.checks.mongodb).toBeDefined();
+      expect(res.body.checks.redis).toBeDefined();
+    });
   });
 
   describe('Route Not Found (404)', () => {

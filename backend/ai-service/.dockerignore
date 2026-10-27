@@ -1,0 +1,15 @@
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+tests
+.env
+.git
+.github
+data
+chroma_db
+chroma_storage
+storage
+
