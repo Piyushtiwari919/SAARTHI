@@ -37,6 +37,7 @@ export interface LoginCredentials {
 export interface SignupData {
   fullName: string;
   email: string;
+  password?: string;
   institution: string;
   course: string;
   agreeToPrivacy: boolean;

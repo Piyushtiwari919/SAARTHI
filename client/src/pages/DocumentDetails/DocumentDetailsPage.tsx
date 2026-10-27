@@ -10,6 +10,7 @@ import { LoadingState } from '../../components/ui/LoadingState.tsx';
 import { ErrorState } from '../../components/ui/ErrorState.tsx';
 import { ArrowLeft, Lock, BookOpen, Trash2, RotateCcw, Shield } from 'lucide-react';
 import { documentService } from '../../services/document.service.ts';
+import { USE_MOCKS } from '../../services/api.ts';
 import { DOCUMENT_TYPE_LABELS } from '../../types/document.ts';
 import { formatFileSize, formatDate } from '../../utils/formatters.ts';
 import { useToast } from '../../hooks/useToast.ts';
@@ -62,6 +63,33 @@ export const DocumentDetailsPage: React.FC = () => {
       unsubscribe();
     };
   }, [id]);
+
+  // Polling in real API mode if document is in-flight
+  useEffect(() => {
+    if (USE_MOCKS || !id || !document) return;
+    if (document.status === 'READY' || document.status === 'FAILED') return;
+
+    let ignore = false;
+    const interval = setInterval(async () => {
+      if (ignore) return;
+      try {
+        const statusRes = await documentService.getDocumentStatus(id);
+        if (statusRes.status !== document.status) {
+          const updated = await documentService.getDocument(id);
+          if (!ignore && updated) {
+            setDocument(updated);
+          }
+        }
+      } catch (err) {
+        console.warn('Document status polling warning:', err);
+      }
+    }, 4000);
+
+    return () => {
+      ignore = true;
+      clearInterval(interval);
+    };
+  }, [id, document]);
 
   const handleRetry = async () => {
     if (!document) return;
@@ -209,7 +237,7 @@ export const DocumentDetailsPage: React.FC = () => {
           <Card>
             <CardHeader>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <CardTitle>Extracted Evidence Attributes ({document.extractedAttributes.length})</CardTitle>
+                <CardTitle>Extracted Evidence Attributes ({document.extractedAttributes?.length || 0})</CardTitle>
                 <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                   Grounded in document clauses
                 </span>
@@ -217,7 +245,7 @@ export const DocumentDetailsPage: React.FC = () => {
             </CardHeader>
 
             <CardContent>
-              {document.extractedAttributes.length > 0 ? (
+              {document.extractedAttributes && document.extractedAttributes.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   {document.extractedAttributes.map((attr) => (
                     <div
@@ -282,6 +310,8 @@ export const DocumentDetailsPage: React.FC = () => {
                 >
                   {isFailed
                     ? 'Processing failed before attributes could be extracted. Please retry with a clearer document.'
+                    : document.status === 'UPLOADED'
+                    ? 'Document uploaded securely to private storage. Extraction pipeline worker is awaiting job dispatch.'
                     : 'Extracted attributes will appear here once background OCR and analysis complete.'}
                 </div>
               )}

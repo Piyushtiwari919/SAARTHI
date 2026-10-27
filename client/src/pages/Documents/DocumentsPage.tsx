@@ -10,6 +10,7 @@ import { LoadingState } from '../../components/ui/LoadingState.tsx';
 import { EmptyState } from '../../components/ui/EmptyState.tsx';
 import { Upload, Lock, Search, FileText } from 'lucide-react';
 import { documentService } from '../../services/document.service.ts';
+import { USE_MOCKS } from '../../services/api.ts';
 import { useToast } from '../../hooks/useToast.ts';
 import type { Document, DocumentUploadPayload } from '../../types/document.ts';
 
@@ -39,10 +40,13 @@ export const DocumentsPage: React.FC = () => {
       ]);
       setDocuments(filtered);
       setAllDocsCount(all);
+    } catch (err: any) {
+      console.error('Failed to load documents:', err);
+      toast.error(err?.message || 'Could not load documents');
     } finally {
       setIsLoading(false);
     }
-  }, [activeFilter, searchQuery]);
+  }, [activeFilter, searchQuery, toast]);
 
   // Initial load and filter change
   useEffect(() => {
@@ -53,7 +57,6 @@ export const DocumentsPage: React.FC = () => {
   useEffect(() => {
     const unsubscribe = documentService.subscribe(() => {
       loadDocuments();
-      // If a document is currently open in detail drawer, update it
       if (selectedDoc) {
         documentService.getDocument(selectedDoc.id).then((updated) => {
           if (updated) setSelectedDoc(updated);
@@ -65,6 +68,31 @@ export const DocumentsPage: React.FC = () => {
       unsubscribe();
     };
   }, [loadDocuments, selectedDoc]);
+
+  // Polling in real API mode for in-flight processing documents
+  useEffect(() => {
+    if (USE_MOCKS) return;
+
+    const hasProcessing = documents.some(
+      (d) => d.status !== 'READY' && d.status !== 'FAILED'
+    );
+    if (!hasProcessing) return;
+
+    let isSubscribed = true;
+    const interval = setInterval(async () => {
+      if (!isSubscribed) return;
+      try {
+        await loadDocuments();
+      } catch (err) {
+        console.warn('Background document status refresh error:', err);
+      }
+    }, 5000);
+
+    return () => {
+      isSubscribed = false;
+      clearInterval(interval);
+    };
+  }, [documents, loadDocuments]);
 
   // Filter counts
   const counts = {
@@ -83,9 +111,15 @@ export const DocumentsPage: React.FC = () => {
   };
 
   const handleUploadSubmit = async (payload: DocumentUploadPayload) => {
-    const doc = await documentService.uploadDocument(payload);
-    toast.success(`Document enqueued for processing (${doc.customTitle || doc.fileName})`, 'Upload Received');
-    await loadDocuments();
+    try {
+      const doc = await documentService.uploadDocument(payload);
+      toast.success(`Document uploaded (${doc.customTitle || doc.fileName})`, 'Upload Received');
+      setIsUploadOpen(false);
+      await loadDocuments();
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to upload document');
+      throw err;
+    }
   };
 
   const handleRetry = async (doc: Document) => {
@@ -139,158 +173,134 @@ export const DocumentsPage: React.FC = () => {
         }
       />
 
-      {/* 2. Privacy Messaging Banner */}
+      {/* 2. Privacy Footnote Banner */}
       <div
         style={{
-          padding: '12px 16px',
-          backgroundColor: 'var(--surface)',
-          border: '1px solid var(--border)',
-          borderRadius: 'var(--radius-card)',
           display: 'flex',
           alignItems: 'center',
           gap: '12px',
+          padding: '12px 18px',
+          borderRadius: 'var(--radius-card)',
+          backgroundColor: 'var(--surface)',
+          border: '1px solid var(--border)',
+          color: 'var(--text-secondary)',
+          fontSize: 'var(--text-xs)',
         }}
       >
         <Lock size={16} style={{ color: 'var(--brand-primary)', flexShrink: 0 }} />
-        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
-          <strong>Your document is private.</strong> Upload only the documents you are comfortable processing. Extracted text is used solely for checking scholarship eligibility criteria.
+        <span>
+          <strong>Private storage:</strong> Your documents are encrypted and accessible only through your authenticated account.
         </span>
       </div>
 
-      {/* 3. Search and Filter Controls */}
+      {/* 3. Controls Bar: Filter Tabs & Search Bar */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           flexWrap: 'wrap',
-          gap: '14px',
+          gap: '12px',
         }}
       >
-        {/* Status Filter Tabs */}
+        {/* Filter Pills */}
         <div
-          role="tablist"
-          aria-label="Filter documents by status"
           style={{
             display: 'inline-flex',
             alignItems: 'center',
-            backgroundColor: 'var(--surface-muted)',
+            backgroundColor: 'var(--surface)',
             padding: '4px',
-            borderRadius: 'var(--radius-btn)',
-            border: '1px solid var(--border-subtle)',
-            gap: '2px',
-            maxWidth: '100%',
-            overflowX: 'auto',
+            borderRadius: 'var(--radius-card)',
+            border: '1px solid var(--border)',
+            gap: '4px',
           }}
         >
-          {(
-            [
-              { key: 'ALL', label: 'All', count: counts.ALL },
-              { key: 'PROCESSING', label: 'Processing', count: counts.PROCESSING },
-              { key: 'READY', label: 'Ready', count: counts.READY },
-              { key: 'FAILED', label: 'Failed', count: counts.FAILED },
-            ] as const
-          ).map((tab) => {
-            const isActive = activeFilter === tab.key;
+          {(['ALL', 'PROCESSING', 'READY', 'FAILED'] as FilterTab[]).map((tab) => {
+            const isActive = activeFilter === tab;
+            const labelMap: Record<FilterTab, string> = {
+              ALL: 'All Documents',
+              PROCESSING: 'Processing',
+              READY: 'Ready',
+              FAILED: 'Failed',
+            };
+
             return (
               <button
-                key={tab.key}
-                role="tab"
-                aria-selected={isActive}
-                onClick={() => setActiveFilter(tab.key)}
+                key={tab}
+                onClick={() => setActiveFilter(tab)}
                 style={{
-                  padding: '6px 14px',
-                  borderRadius: 'var(--radius-xs)',
-                  fontSize: 'var(--text-xs)',
-                  fontWeight: isActive ? 600 : 500,
-                  backgroundColor: isActive ? 'var(--surface)' : 'transparent',
-                  color: isActive ? 'var(--brand-primary)' : 'var(--text-secondary)',
-                  boxShadow: isActive ? 'var(--shadow-sm)' : 'none',
-                  border: 'none',
-                  cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
-                  whiteSpace: 'nowrap',
-                  transition: 'all var(--transition-fast)',
+                  padding: '6px 12px',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: 'var(--text-xs)',
+                  fontWeight: isActive ? 600 : 500,
+                  color: isActive ? 'var(--brand-primary)' : 'var(--text-secondary)',
+                  backgroundColor: isActive ? 'var(--brand-primary-light)' : 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'var(--transition-base)',
                 }}
               >
-                <span>{tab.label}</span>
+                <span>{labelMap[tab]}</span>
                 <span
                   style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '2px 6px',
+                    borderRadius: '10px',
                     fontSize: '10px',
-                    padding: '1px 6px',
-                    borderRadius: 'var(--radius-full)',
-                    backgroundColor: isActive ? 'var(--brand-light)' : 'var(--border-subtle)',
-                    color: isActive ? 'var(--brand-primary)' : 'var(--text-muted)',
+                    fontWeight: 700,
+                    backgroundColor: isActive ? 'var(--brand-primary)' : 'var(--border-subtle)',
+                    color: isActive ? '#FFFFFF' : 'var(--text-muted)',
                   }}
                 >
-                  {tab.count}
+                  {counts[tab]}
                 </span>
               </button>
             );
           })}
         </div>
 
-        {/* Quick Search */}
+        {/* Search Bar Input */}
         <div style={{ width: '100%', maxWidth: '280px' }}>
           <Input
+            placeholder="Search by name, course, or category..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search documents by name..."
-            leftIcon={<Search size={15} />}
-            style={{ padding: '6px 12px 6px 34px', fontSize: 'var(--text-xs)' }}
+            leftIcon={<Search size={14} />}
           />
         </div>
       </div>
 
-      {/* 4. Document Grid / List or Empty State */}
+      {/* 4. Main Document Content Area */}
       {isLoading ? (
-        <LoadingState message="Loading documents from private vault..." fullHeight />
+        <LoadingState message="Retrieving documents from your vault..." fullHeight />
       ) : documents.length === 0 ? (
-        activeFilter === 'ALL' && !searchQuery ? (
-          <EmptyState
-            icon={<FileText size={24} />}
-            title="No documents yet"
-            description="Upload a scholarship notice or your supporting documents to start building your Saarthi profile."
-            action={
-              <Button
-                variant="primary"
-                leftIcon={<Upload size={16} />}
-                onClick={() => setIsUploadOpen(true)}
-              >
-                Upload Document
-              </Button>
-            }
-          />
-        ) : (
-          <EmptyState
-            icon={<Search size={24} />}
-            title={`No ${activeFilter.toLowerCase()} documents found`}
-            description={
-              searchQuery
-                ? `No documents matched "${searchQuery}". Try clearing your search.`
-                : `You currently have zero documents in the ${activeFilter.toLowerCase()} stage.`
-            }
-            action={
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  setActiveFilter('ALL');
-                  setSearchQuery('');
-                }}
-              >
-                Reset Filters
-              </Button>
-            }
-          />
-        )
+        <EmptyState
+          icon={<FileText size={40} />}
+          title={searchQuery ? 'No matching documents found' : 'Your vault is empty'}
+          description={
+            searchQuery
+              ? `No documents matched "${searchQuery}". Try searching with a different term.`
+              : 'Upload marksheets, certificates, or notices to analyze your eligibility.'
+          }
+          action={
+            <Button
+              variant="primary"
+              onClick={searchQuery ? () => setSearchQuery('') : () => setIsUploadOpen(true)}
+            >
+              {searchQuery ? 'Clear Search' : 'Upload First Document'}
+            </Button>
+          }
+        />
       ) : (
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 300px), 1fr))',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 320px), 1fr))',
             gap: '16px',
           }}
         >
@@ -299,21 +309,21 @@ export const DocumentsPage: React.FC = () => {
               key={doc.id}
               document={doc}
               onView={handleViewDetails}
-              onDelete={(d) => setDocToDelete(d)}
               onRetry={handleRetry}
+              onDelete={(d) => setDocToDelete(d)}
             />
           ))}
         </div>
       )}
 
-      {/* Upload Modal */}
+      {/* 5. Upload Document Modal */}
       <DocumentUploadModal
         isOpen={isUploadOpen}
         onClose={() => setIsUploadOpen(false)}
         onUpload={handleUploadSubmit}
       />
 
-      {/* Document Details Drawer / Modal */}
+      {/* 6. Document Detail Drawer */}
       <DocumentDetailDrawer
         document={selectedDoc}
         isOpen={isDetailOpen}
@@ -321,11 +331,13 @@ export const DocumentsPage: React.FC = () => {
           setIsDetailOpen(false);
           setSelectedDoc(null);
         }}
-        onDelete={(d) => setDocToDelete(d)}
         onRetry={handleRetry}
+        onDelete={(d) => {
+          setDocToDelete(d);
+        }}
       />
 
-      {/* Delete Confirmation Dialog */}
+      {/* 7. Permanent Delete Confirmation Modal */}
       <ConfirmDialog
         isOpen={!!docToDelete}
         onClose={() => setDocToDelete(null)}

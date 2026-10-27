@@ -15,6 +15,31 @@ class EligibilityService {
     );
   }
 
+  public async evaluateOpportunity(
+    opportunityId: string
+  ): Promise<OpportunityEligibility> {
+    if (USE_MOCKS) {
+      await simulateLatency(300);
+      return (
+        mockEligibilityResults[opportunityId] || {
+          opportunityId,
+          opportunityTitle: 'Scholarship Opportunity',
+          overallStatus: 'PASS',
+          confidenceScore: 90,
+          evaluatedAt: new Date().toISOString(),
+          summary: 'Mock criteria evaluated.',
+          requirements: [],
+          missingDocuments: [],
+          actionItems: [],
+        }
+      );
+    }
+    return ApiService.request<OpportunityEligibility>('/api/eligibility/evaluate', {
+      method: 'POST',
+      body: JSON.stringify({ opportunityId }),
+    });
+  }
+
   public async getAllEligibilitySummaries(): Promise<OpportunityEligibility[]> {
     if (USE_MOCKS) {
       await simulateLatency(250);

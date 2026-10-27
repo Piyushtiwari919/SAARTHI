@@ -8,6 +8,7 @@ import { errorHandler, AppError } from './middleware/error-handler.js';
 import { authRoutes } from './modules/auth/auth.routes.js';
 import { documentRoutes } from './modules/documents/document.routes.js';
 import { eligibilityRouter } from './modules/eligibility/eligibility.routes.js';
+import { opportunityRouter } from './modules/eligibility/opportunity.routes.js';
 
 export function createApp(): Express {
   const app = express();
@@ -55,11 +56,13 @@ export function createApp(): Express {
   app.use('/api/v1/auth', authRoutes);
   app.use('/api/v1/documents', documentRoutes);
   app.use('/api/v1/eligibility', eligibilityRouter);
+  app.use('/api/v1/opportunities', opportunityRouter);
 
   // 6. Direct /api/ aliases (Frontend service compatibility)
   app.use('/api/auth', authRoutes);
   app.use('/api/documents', documentRoutes);
   app.use('/api/eligibility', eligibilityRouter);
+  app.use('/api/opportunities', opportunityRouter);
 
   // 7. 404 Route Handler
   app.use((req: Request, _res: Response, next: NextFunction) => {

@@ -28,6 +28,12 @@ export const EligibilityStatusBadge: React.FC<EligibilityStatusBadgeProps> = ({
           icon: <XCircle size={size === 'sm' ? 12 : 14} />,
           defaultLabel: 'Ineligible (Fail)',
         };
+      case 'UNKNOWN':
+        return {
+          variant: 'warning',
+          icon: <HelpCircle size={size === 'sm' ? 12 : 14} />,
+          defaultLabel: 'Unknown (Needs Review)',
+        };
       case 'NOT_VERIFIED':
       default:
         return {

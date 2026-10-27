@@ -3,14 +3,23 @@ import type { UserProfile, LoginCredentials, SignupData, AuthSession } from '../
 import { mockUserProfile } from '../mocks/data/user.mock.ts';
 
 class AuthService {
-  private currentUser: UserProfile | null = mockUserProfile;
+  private currentUser: UserProfile | null = USE_MOCKS ? mockUserProfile : null;
 
   public async getCurrentUser(): Promise<UserProfile | null> {
     if (USE_MOCKS) {
       await simulateLatency(150);
       return this.currentUser;
     }
-    return ApiService.request<UserProfile>('/api/auth/me');
+
+    try {
+      const user = await ApiService.request<UserProfile>('/api/auth/me');
+      this.currentUser = user;
+      return user;
+    } catch {
+      this.currentUser = null;
+      ApiService.setAuthToken(null);
+      return null;
+    }
   }
 
   public async login(credentials: LoginCredentials): Promise<AuthSession> {
@@ -75,9 +84,12 @@ class AuthService {
       return;
     }
 
-    await ApiService.request<void>('/api/auth/logout', { method: 'POST' });
-    ApiService.setAuthToken(null);
-    this.currentUser = null;
+    try {
+      await ApiService.request<void>('/api/auth/logout', { method: 'POST' });
+    } finally {
+      ApiService.setAuthToken(null);
+      this.currentUser = null;
+    }
   }
 }
 

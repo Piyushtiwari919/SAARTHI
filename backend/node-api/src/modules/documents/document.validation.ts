@@ -15,17 +15,18 @@ export const documentTypeSchema = z.enum([
 ]);
 
 export const uploadDocumentBodySchema = z.object({
-  documentType: documentTypeSchema.or(
-    z.string().transform((val) => {
-      // Allow 'category' fallback from frontend payload
-      return val as z.infer<typeof documentTypeSchema>;
-    })
-  ),
-  category: documentTypeSchema.optional(),
-  customTitle: z.string().optional(),
-  isSensitive: z
+  documentType: z
     .string()
     .optional()
-    .transform((val) => val === 'true' || val === undefined),
+    .transform((val) => (val === 'SCHOLARSHIP_DOCUMENT' ? 'SCHOLARSHIP_NOTICE' : val)),
+  category: z
+    .string()
+    .optional()
+    .transform((val) => (val === 'SCHOLARSHIP_DOCUMENT' ? 'SCHOLARSHIP_NOTICE' : val)),
+  customTitle: z.string().optional(),
+  isSensitive: z
+    .union([z.string(), z.boolean()])
+    .optional()
+    .transform((val) => val === 'true' || val === true || val === undefined),
 });
 
