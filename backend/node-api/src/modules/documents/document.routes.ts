@@ -14,6 +14,7 @@ router.get('/', DocumentController.listDocuments);
 router.get('/:id', DocumentController.getDocument);
 router.get('/:id/status', DocumentController.getDocumentStatus);
 router.get('/:id/content', DocumentController.getDocumentContent);
+router.post('/:id/retry', DocumentController.retryDocument);
 router.delete('/:id', DocumentController.deleteDocument);
 
 export { router as documentRoutes };

@@ -2,7 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import { DocumentService } from './document.service.js';
 import { uploadDocumentBodySchema } from './document.validation.js';
-import { DocumentTypeEnum } from './document.model.js';
+import { DocumentTypeEnum, DocumentModel } from './document.model.js';
+import { enqueueDocumentJob } from '../../queue/document-queue.js';
 
 // Multer memory storage with 10 MB strict limit
 export const upload = multer({
@@ -37,6 +38,9 @@ export class DocumentController {
         buffer: req.file.buffer,
         clientMimeType: req.file.mimetype,
       });
+
+      // Dispatch to BullMQ background extraction queue
+      await enqueueDocumentJob(doc.id, `req_${Date.now()}`);
 
       res.status(201).json(doc);
     } catch (error) {
@@ -135,6 +139,32 @@ export class DocumentController {
         success: true,
         message: 'Document deleted successfully',
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  public static async retryDocument(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: 'Unauthorized' });
+        return;
+      }
+
+      const documentId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const doc = await DocumentService.getDocumentById(req.user.id, documentId);
+      if (!doc) {
+        res.status(404).json({ success: false, message: 'Document not found or access denied' });
+        return;
+      }
+
+      doc.status = 'QUEUED';
+      doc.progressPercent = 10;
+      doc.statusMessage = 'Job queued for re-processing';
+      await doc.save();
+
+      await enqueueDocumentJob(doc.id, `retry_${Date.now()}`);
+      res.status(200).json(doc);
     } catch (error) {
       next(error);
     }

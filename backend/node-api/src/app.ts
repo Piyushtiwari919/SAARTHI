@@ -2,7 +2,9 @@ import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
+import mongoose from 'mongoose';
 import { env } from './config/env.js';
+import { checkRedisHealth } from './config/redis.js';
 import { apiLimiter } from './middleware/rate-limit.js';
 import { errorHandler, AppError } from './middleware/error-handler.js';
 import { authRoutes } from './modules/auth/auth.routes.js';
@@ -38,7 +40,7 @@ export function createApp(): Express {
   // 3. Rate limiting for general API requests
   app.use('/api', apiLimiter);
 
-  // 4. Health Check Endpoints
+  // 4. Health & Readiness Check Endpoints
   const healthCheckHandler = (_req: Request, res: Response) => {
     res.status(200).json({
       status: 'UP',
@@ -49,9 +51,39 @@ export function createApp(): Express {
     });
   };
 
+  const readinessCheckHandler = async (_req: Request, res: Response) => {
+    const mongoState = mongoose.connection.readyState;
+    const mongoStatus = mongoState === 1 ? 'UP' : mongoState === 2 ? 'CONNECTING' : 'DOWN';
+    const redisHealth = await checkRedisHealth();
+
+    const isHealthy = mongoStatus === 'UP' || env.NODE_ENV !== 'production';
+    const statusCode = (mongoStatus === 'UP' || env.NODE_ENV === 'test') ? 200 : 503;
+
+    res.status(statusCode).json({
+      status: isHealthy ? 'UP' : 'DEGRADED',
+      service: 'saarthi-node-api',
+      environment: env.NODE_ENV,
+      checks: {
+        mongodb: {
+          status: mongoStatus,
+        },
+        redis: {
+          status: redisHealth.status,
+          latencyMs: redisHealth.latencyMs,
+          message: redisHealth.message,
+        },
+      },
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+    });
+  };
+
   app.get('/health', healthCheckHandler);
+  app.get('/health/ready', readinessCheckHandler);
   app.get('/api/v1/health', healthCheckHandler);
+  app.get('/api/v1/health/ready', readinessCheckHandler);
   app.get('/api/health', healthCheckHandler);
+  app.get('/api/health/ready', readinessCheckHandler);
 
   // 5. Versioned API Routes
   app.use('/api/v1/auth', authRoutes);

@@ -33,9 +33,104 @@ services:
       retries: 5
       start_period: 5s
 
+  ai-service:
+    build:
+      context: ../backend/ai-service
+      dockerfile: Dockerfile
+    container_name: saarthi-ai-service
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      INTERNAL_SERVICE_TOKEN: "saarthi-internal-dev-token-change-in-production-min32chars"
+      STORAGE_DIR: "/data/storage"
+      CHROMA_PERSIST_DIR: "/data/chroma"
+      ANONYMIZED_TELEMETRY: "False"
+      LOG_LEVEL: "INFO"
+    volumes:
+      - saarthi-chroma-data:/data/chroma
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  api:
+    build:
+      context: ../backend/node-api
+      dockerfile: Dockerfile
+    container_name: saarthi-api
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      NODE_ENV: "production"
+      PORT: "5000"
+      CLIENT_URL: "http://localhost:5173"
+      MONGODB_URI: "mongodb://mongodb:27017/saarthi"
+      REDIS_HOST: "redis"
+      REDIS_PORT: "6379"
+      ENABLE_BACKGROUND_WORKER: "false"
+      AI_SERVICE_URL: "http://ai-service:8000"
+      INTERNAL_SERVICE_TOKEN: "saarthi-internal-dev-token-change-in-production-min32chars"
+      JWT_SECRET: "saarthi-production-jwt-super-secret-key-minimum-32-chars-long"
+      COOKIE_SECRET: "saarthi-production-cookie-super-secret-key-minimum-32-chars"
+      STORAGE_DRIVER: "local"
+      LOCAL_STORAGE_PATH: "/data/uploads"
+    volumes:
+      - saarthi-uploads:/data/uploads
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ai-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  worker:
+    build:
+      context: ../backend/node-api
+      dockerfile: Dockerfile
+    container_name: saarthi-worker
+    command: ["node", "dist/worker.js"]
+    restart: unless-stopped
+    environment:
+      NODE_ENV: "production"
+      PORT: "5000"
+      CLIENT_URL: "http://localhost:5173"
+      MONGODB_URI: "mongodb://mongodb:27017/saarthi"
+      REDIS_HOST: "redis"
+      REDIS_PORT: "6379"
+      ENABLE_BACKGROUND_WORKER: "false"
+      AI_SERVICE_URL: "http://ai-service:8000"
+      INTERNAL_SERVICE_TOKEN: "saarthi-internal-dev-token-change-in-production-min32chars"
+      JWT_SECRET: "saarthi-production-jwt-super-secret-key-minimum-32-chars-long"
+      COOKIE_SECRET: "saarthi-production-cookie-super-secret-key-minimum-32-chars"
+      STORAGE_DRIVER: "local"
+      LOCAL_STORAGE_PATH: "/data/uploads"
+    volumes:
+      - saarthi-uploads:/data/uploads
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ai-service:
+        condition: service_healthy
+
 volumes:
   saarthi-mongodb-data:
     driver: local
   saarthi-redis-data:
     driver: local
-
+  saarthi-uploads:
+    driver: local
+  saarthi-chroma-data:
+    driver: local
