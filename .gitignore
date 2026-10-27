@@ -58,3 +58,10 @@ dist/
 .vite/
 .vite-temp/
 *.log
+
+
+# Vector Store and Upload Storage
+storage/
+chroma_data/
+*.sqlite3
+*.db

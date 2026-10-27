@@ -1,11 +1,11 @@
-"""Main FastAPI application entry point for Saarthi AI Document Extraction Service."""
+"""Main FastAPI application entry point for Saarthi AI Document Extraction & Intelligence Service."""
 
 import logging
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from app.api.routes import extraction, health
+from app.api.routes import extraction, health, rag
 from app.core.config import get_settings
 from app.schemas.extraction import ErrorResponse
 from app.utils.file_validation import DocumentServiceException
@@ -19,12 +19,12 @@ logger = logging.getLogger("saarthi.ai_service")
 
 
 def create_app() -> FastAPI:
-    """Application factory for Saarthi AI Extraction Service."""
+    """Application factory for Saarthi AI Extraction & RAG Service."""
     settings = get_settings()
 
     app = FastAPI(
-        title="Saarthi AI Document Extraction Service",
-        description="Internal document processing and structured information extraction service",
+        title="Saarthi AI Document Intelligence Service",
+        description="Internal document processing, structured information extraction, and source-grounded RAG service",
         version="1.0.0",
         docs_url="/docs" if settings.ENVIRONMENT != "production" else None,
         redoc_url="/redoc" if settings.ENVIRONMENT != "production" else None,
@@ -33,6 +33,7 @@ def create_app() -> FastAPI:
     # Register routers
     app.include_router(health.router)
     app.include_router(extraction.router)
+    app.include_router(rag.router)
 
     # Custom exception handler for domain DocumentServiceException
     @app.exception_handler(DocumentServiceException)
@@ -94,4 +95,3 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
-
