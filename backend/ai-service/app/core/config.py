@@ -7,7 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Configuration settings for Saarthi AI Document Extraction Service."""
+    """Configuration settings for Saarthi AI Document Intelligence Service."""
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -19,16 +19,16 @@ class Settings(BaseSettings):
     # Environment
     ENVIRONMENT: Literal["development", "test", "production"] = "development"
 
-    # Service-to-service auth token between Node.js worker and FastAPI
+    # Service-to-service auth token between Node.js worker/backend and FastAPI
     INTERNAL_SERVICE_TOKEN: str = Field(
         default="",
-        description="Shared secret for authenticating internal requests from Node.js worker",
+        description="Shared secret for authenticating internal requests from Node.js",
     )
 
     # Provider configuration
     AI_PROVIDER: Literal["local", "gemini"] = Field(
         default="local",
-        description="Active AI extraction provider",
+        description="Active AI extraction and RAG provider",
     )
     GEMINI_API_KEY: str = Field(
         default="",
@@ -36,11 +36,15 @@ class Settings(BaseSettings):
     )
     GEMINI_MODEL: str = Field(
         default="gemini-2.5-flash",
-        description="Google Gemini model identifier",
+        description="Google Gemini text generation model identifier",
+    )
+    GEMINI_EMBEDDING_MODEL: str = Field(
+        default="text-embedding-004",
+        description="Google Gemini embedding model identifier",
     )
     PROVIDER_TIMEOUT_SECONDS: float = Field(
         default=30.0,
-        description="Maximum seconds to wait for AI provider extraction",
+        description="Maximum seconds to wait for AI provider calls",
     )
 
     # Document upload limits
@@ -63,6 +67,20 @@ class Settings(BaseSettings):
         description="Custom path to tesseract executable (especially on Windows)",
     )
 
+    # RAG Vector Store & Retrieval Configuration
+    CHROMA_PERSIST_DIR: str = Field(
+        default="./chroma_data",
+        description="Directory path for persistent ChromaDB vector storage",
+    )
+    RAG_TOP_K: int = Field(
+        default=5,
+        description="Default number of relevant chunks to retrieve for RAG",
+    )
+    RAG_RELEVANCE_THRESHOLD: float = Field(
+        default=0.35,
+        description="Minimum cosine relevance score threshold to consider a chunk relevant",
+    )
+
     def is_gemini_configured(self) -> bool:
         """Check if Gemini provider is configured with an API key."""
         return bool(self.GEMINI_API_KEY and self.GEMINI_API_KEY.strip())
@@ -76,6 +94,8 @@ class Settings(BaseSettings):
             f"INTERNAL_SERVICE_TOKEN='***' if set else '', "
             f"GEMINI_API_KEY='***' if set else '', "
             f"GEMINI_MODEL='{self.GEMINI_MODEL}', "
+            f"GEMINI_EMBEDDING_MODEL='{self.GEMINI_EMBEDDING_MODEL}', "
+            f"CHROMA_PERSIST_DIR='{self.CHROMA_PERSIST_DIR}', "
             f"MAX_UPLOAD_BYTES={self.MAX_UPLOAD_BYTES}, "
             f"MAX_PDF_PAGES={self.MAX_PDF_PAGES}, "
             f"OCR_ENABLED={self.OCR_ENABLED}"
@@ -87,4 +107,3 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """Retrieve cached application settings instance."""
     return Settings()
-

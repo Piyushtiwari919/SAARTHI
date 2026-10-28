@@ -10,6 +10,12 @@ export type DocumentProcessingStatus =
   | 'READY'
   | 'FAILED';
 
+export type DocumentIndexingStatus =
+  | 'NOT_INDEXED'
+  | 'INDEXING'
+  | 'INDEXED'
+  | 'INDEX_FAILED';
+
 export type DocumentTypeEnum =
   | 'INCOME_CERTIFICATE'
   | 'SCHOLARSHIP_NOTICE'
@@ -44,6 +50,7 @@ export interface IDocumentRecord extends Document {
   mimeType: string;
   fileSizeBytes: number;
   status: DocumentProcessingStatus;
+  indexingStatus: DocumentIndexingStatus;
   progressPercent: number;
   statusMessage?: string;
   isSensitive: boolean;
@@ -74,8 +81,9 @@ const DocumentSchema = new Schema<IDocumentRecord>(
         'FEE_RECEIPT',
         'OTHER',
       ],
+      index: true,
     },
-    storageKey: { type: String, required: true, select: false },
+    storageKey: { type: String, required: true },
     mimeType: { type: String, required: true },
     fileSizeBytes: { type: Number, required: true },
     status: {
@@ -91,6 +99,12 @@ const DocumentSchema = new Schema<IDocumentRecord>(
         'FAILED',
       ],
       default: 'UPLOADED',
+      index: true,
+    },
+    indexingStatus: {
+      type: String,
+      enum: ['NOT_INDEXED', 'INDEXING', 'INDEXED', 'INDEX_FAILED'],
+      default: 'NOT_INDEXED',
       index: true,
     },
     progressPercent: { type: Number, default: 0 },
@@ -117,6 +131,7 @@ const DocumentSchema = new Schema<IDocumentRecord>(
         ret.id = (ret._id as Types.ObjectId)?.toString();
         ret.userId = (ret.ownerId as Types.ObjectId)?.toString();
         ret.category = ret.documentType;
+        ret.indexingStatus = ret.indexingStatus || 'NOT_INDEXED';
         delete ret._id;
         delete ret.__v;
         delete ret.storageKey; // Never leak internal storage keys to the client
@@ -130,4 +145,3 @@ const DocumentSchema = new Schema<IDocumentRecord>(
 DocumentSchema.index({ ownerId: 1, createdAt: -1 });
 
 export const DocumentModel = mongoose.model<IDocumentRecord>('Document', DocumentSchema);
-

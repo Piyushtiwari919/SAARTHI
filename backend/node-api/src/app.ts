@@ -2,13 +2,16 @@ import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
+import mongoose from 'mongoose';
 import { env } from './config/env.js';
+import { checkRedisHealth } from './config/redis.js';
 import { apiLimiter } from './middleware/rate-limit.js';
 import { errorHandler, AppError } from './middleware/error-handler.js';
 import { authRoutes } from './modules/auth/auth.routes.js';
 import { documentRoutes } from './modules/documents/document.routes.js';
 import { eligibilityRouter } from './modules/eligibility/eligibility.routes.js';
 import { opportunityRouter } from './modules/eligibility/opportunity.routes.js';
+import { assistantRouter } from './modules/assistant/assistant.routes.js';
 
 export function createApp(): Express {
   const app = express();
@@ -37,7 +40,7 @@ export function createApp(): Express {
   // 3. Rate limiting for general API requests
   app.use('/api', apiLimiter);
 
-  // 4. Health Check Endpoints
+  // 4. Health & Readiness Check Endpoints
   const healthCheckHandler = (_req: Request, res: Response) => {
     res.status(200).json({
       status: 'UP',
@@ -48,21 +51,53 @@ export function createApp(): Express {
     });
   };
 
-  app.get('/health', healthCheckHandler);
-  app.get('/api/v1/health', healthCheckHandler);
-  app.get('/api/health', healthCheckHandler);
+  const readinessCheckHandler = async (_req: Request, res: Response) => {
+    const mongoState = mongoose.connection.readyState;
+    const mongoStatus = mongoState === 1 ? 'UP' : mongoState === 2 ? 'CONNECTING' : 'DOWN';
+    const redisHealth = await checkRedisHealth();
 
-  // 5. Versioned API Routes (Day 1-2 API contract)
+    const isHealthy = mongoStatus === 'UP' || env.NODE_ENV !== 'production';
+    const statusCode = (mongoStatus === 'UP' || env.NODE_ENV === 'test') ? 200 : 503;
+
+    res.status(statusCode).json({
+      status: isHealthy ? 'UP' : 'DEGRADED',
+      service: 'saarthi-node-api',
+      environment: env.NODE_ENV,
+      checks: {
+        mongodb: {
+          status: mongoStatus,
+        },
+        redis: {
+          status: redisHealth.status,
+          latencyMs: redisHealth.latencyMs,
+          message: redisHealth.message,
+        },
+      },
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+    });
+  };
+
+  app.get('/health', healthCheckHandler);
+  app.get('/health/ready', readinessCheckHandler);
+  app.get('/api/v1/health', healthCheckHandler);
+  app.get('/api/v1/health/ready', readinessCheckHandler);
+  app.get('/api/health', healthCheckHandler);
+  app.get('/api/health/ready', readinessCheckHandler);
+
+  // 5. Versioned API Routes
   app.use('/api/v1/auth', authRoutes);
   app.use('/api/v1/documents', documentRoutes);
   app.use('/api/v1/eligibility', eligibilityRouter);
   app.use('/api/v1/opportunities', opportunityRouter);
+  app.use('/api/v1/assistant', assistantRouter);
 
   // 6. Direct /api/ aliases (Frontend service compatibility)
   app.use('/api/auth', authRoutes);
   app.use('/api/documents', documentRoutes);
   app.use('/api/eligibility', eligibilityRouter);
   app.use('/api/opportunities', opportunityRouter);
+  app.use('/api/assistant', assistantRouter);
 
   // 7. 404 Route Handler
   app.use((req: Request, _res: Response, next: NextFunction) => {
@@ -76,4 +111,3 @@ export function createApp(): Express {
 }
 
 export const app = createApp();
-

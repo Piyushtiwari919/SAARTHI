@@ -21,6 +21,10 @@ const envSchema = z.object({
   AWS_SECRET_ACCESS_KEY: z.string().optional(),
   AI_SERVICE_URL: z.string().default('http://127.0.0.1:8000'),
   INTERNAL_SERVICE_TOKEN: z.string().default('dev_internal_secret_token_change_me_in_production'),
+  REDIS_HOST: z.string().default('127.0.0.1'),
+  REDIS_PORT: z.coerce.number().default(6379),
+  REDIS_PASSWORD: z.string().optional(),
+  ENABLE_BACKGROUND_WORKER: z.coerce.boolean().default(false),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -34,4 +38,3 @@ export const env = {
   ...parsed.data,
   RESOLVED_LOCAL_STORAGE_DIR: path.resolve(process.cwd(), parsed.data.LOCAL_STORAGE_DIR),
 };
-

@@ -3,11 +3,41 @@ import type {
   AssistantConversation,
   AssistantQueryRequest,
   AssistantQueryResponse,
+  ScholarshipNoticeItem,
 } from '../types/assistant.ts';
 import { mockConversations } from '../mocks/data/assistant.mock.ts';
 
 class AssistantService {
   private conversations: AssistantConversation[] = [...mockConversations];
+
+  public async getAvailableNotices(): Promise<ScholarshipNoticeItem[]> {
+    if (USE_MOCKS) {
+      await simulateLatency(150);
+      return [
+        {
+          id: 'doc_css_notice_mock',
+          fileName: 'Central_Sector_Scheme_Notice_2026.pdf',
+          customTitle: 'Central Sector Scheme Official Guidelines',
+          documentType: 'SCHOLARSHIP_NOTICE',
+          status: 'READY',
+          indexingStatus: 'INDEXED',
+          pageCount: 6,
+          createdAt: new Date().toISOString(),
+        },
+      ];
+    }
+    return ApiService.request<ScholarshipNoticeItem[]>('/api/assistant/documents');
+  }
+
+  public async indexNotice(documentId: string): Promise<{ status: string; chunkCount: number }> {
+    if (USE_MOCKS) {
+      await simulateLatency(400);
+      return { status: 'INDEXED', chunkCount: 12 };
+    }
+    return ApiService.request<{ status: string; chunkCount: number }>(`/api/assistant/index/${documentId}`, {
+      method: 'POST',
+    });
+  }
 
   public async getConversations(): Promise<AssistantConversation[]> {
     if (USE_MOCKS) {
@@ -21,6 +51,7 @@ class AssistantService {
     if (USE_MOCKS) {
       await simulateLatency(500); // Simulate RAG retrieval + LLM synthesis
       return {
+        status: 'ANSWERED',
         conversationId: request.conversationId || 'conv_new_mock',
         answer: `According to Section 4 of the guidelines, eligibility is strictly verified based on the submitted official marksheets and income certificate. For "${request.question}", the policy requires full documentation prior to the scholarship verification deadline.`,
         sources: [
@@ -42,7 +73,11 @@ class AssistantService {
 
     return ApiService.request<AssistantQueryResponse>('/api/assistant/query', {
       method: 'POST',
-      body: JSON.stringify(request),
+      body: JSON.stringify({
+        documentId: request.documentId,
+        question: request.question,
+        topK: request.topK,
+      }),
     });
   }
 }

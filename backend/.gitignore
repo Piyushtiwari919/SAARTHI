@@ -5,3 +5,16 @@ __pycache__/
 .env
 .env.*
 !.env.example
+
+# Vector Store and Upload Storage
+storage/
+chroma_data/
+*.sqlite3
+*.db
+
+# Vector Store and Upload Storage
+storage/
+chroma_data/
+*.sqlite3
+*.db
+
