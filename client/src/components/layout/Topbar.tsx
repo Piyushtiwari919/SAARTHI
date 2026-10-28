@@ -1,140 +1,119 @@
+
 import React from 'react';
-import { Menu, Search, ShieldCheck, LogOut } from 'lucide-react';
+import {
+  Menu,
+  Search,
+  ShieldCheck,
+  LogOut,
+  Sparkles,
+  Sun,
+  Moon,
+} from 'lucide-react';
 import { Avatar } from '../ui/Avatar.tsx';
-import { Badge } from '../ui/Badge.tsx';
 import { useAuth } from '../../hooks/useAuth.ts';
+import  { useState } from 'react';
+
+
 
 export interface TopbarProps {
   onOpenMobileMenu: () => void;
 }
-
-export const Topbar: React.FC<TopbarProps> = ({ onOpenMobileMenu }) => {
+// before change default  
+// export const Topbar: React.FC<TopbarProps> = ({
+//   onOpenMobileMenu,
+// }) => {
+//   const { user, logout } = useAuth();
+export const Topbar: React.FC<TopbarProps> = ({
+  onOpenMobileMenu,
+}) => {
   const { user, logout } = useAuth();
 
+  const [isDark, setIsDark] = useState(() => {
+    return (
+      document.documentElement.dataset.theme === 'dark'
+    );
+  });
+
+  const toggleTheme = () => {
+    const nextTheme = isDark ? 'light' : 'dark';
+
+    document.documentElement.dataset.theme = nextTheme;
+    localStorage.setItem('saarthi-theme', nextTheme);
+    setIsDark(nextTheme === 'dark');
+  };
+
+  // Keep your existing return (...) JSX here.
+
   return (
-    <header
-      className="saarthi-topbar"
-      style={{
-        height: 'var(--topbar-height)',
-        backgroundColor: 'var(--surface)',
-        borderBottom: '1px solid var(--border)',
-        position: 'sticky',
-        top: 0,
-        zIndex: 900,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '0 24px',
-      }}
-    >
-      {/* Left: Mobile Toggle & Quick Search */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1, minWidth: 0, maxWidth: '540px' }}>
+    <header className="saarthi-topbar">
+      <div className="topbar-left">
         <button
           onClick={onOpenMobileMenu}
           className="topbar-menu-btn"
           aria-label="Open navigation menu"
-          style={{
-            display: 'none', // Handled via responsive CSS
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--text-secondary)',
-            padding: '6px',
-            borderRadius: 'var(--radius-xs)',
-          }}
         >
-          <Menu size={20} />
+          <Menu size={21} />
         </button>
 
-        <div
-          className="topbar-search-container"
-          style={{
-            position: 'relative',
-            width: '100%',
-            maxWidth: '360px',
-            minWidth: 0,
-            display: 'flex',
-            alignItems: 'center',
-          }}
-        >
-          <Search
-            size={16}
-            style={{
-              position: 'absolute',
-              left: '12px',
-              color: 'var(--text-muted)',
-              pointerEvents: 'none',
-            }}
-          />
+        <div className="topbar-search-container">
+          <Search size={18} className="topbar-search-icon" />
+
           <input
             type="search"
-            placeholder="Search scholarships, grants, or documents..."
-            style={{
-              width: '100%',
-              backgroundColor: 'var(--surface-muted)',
-              border: '1px solid transparent',
-              borderRadius: 'var(--radius-btn)',
-              padding: '7px 12px 7px 36px',
-              fontSize: 'var(--text-xs)',
-              color: 'var(--text-primary)',
-              outline: 'none',
-              transition: 'all var(--transition-fast)',
-            }}
-            onFocus={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--surface)';
-              e.currentTarget.style.borderColor = 'var(--border)';
-            }}
-            onBlur={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--surface-muted)';
-              e.currentTarget.style.borderColor = 'transparent';
-            }}
+            placeholder="Search opportunities, documents..."
+            aria-label="Search opportunities and documents"
           />
+
+          <span className="topbar-search-shortcut">Search</span>
         </div>
       </div>
 
-      {/* Right: Privacy Badge & User controls */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+      <div className="topbar-right">
         <div className="topbar-privacy-badge">
-          <Badge variant="brand" size="sm" icon={<ShieldCheck size={12} />}>
-            Verified Student Session
-          </Badge>
+          <span className="topbar-verified-icon">
+            <ShieldCheck size={15} />
+          </span>
+          <span>Secure workspace</span>
         </div>
+        <button
+              type="button"
+              onClick={toggleTheme}
+              className="topbar-theme-btn"
+              title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+              aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              {isDark ? <Sun size={18} /> : <Moon size={18} />}
+        </button>
+
+        <div className="topbar-divider" />
 
         {user && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Avatar name={user.fullName} size="sm" />
-              <span
-                style={{
-                  fontSize: 'var(--text-sm)',
-                  fontWeight: 500,
-                  color: 'var(--text-primary)',
-                  display: 'none',
-                }}
-                className="topbar-username"
-              >
+          <div className="topbar-account">
+            <Avatar name={user.fullName} size="sm" />
+
+            <div className="topbar-account-details">
+              <span className="topbar-username">
                 {user.fullName}
+              </span>
+              <span className="topbar-account-caption">
+                Student account
               </span>
             </div>
 
             <button
               onClick={() => logout()}
+              className="topbar-logout-btn"
               title="Sign out"
               aria-label="Sign out"
-              style={{
-                color: 'var(--text-muted)',
-                padding: '6px',
-                borderRadius: 'var(--radius-xs)',
-                display: 'flex',
-                alignItems: 'center',
-                transition: 'color var(--transition-fast)',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--danger)')}
-              onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
             >
-              <LogOut size={16} />
+              <LogOut size={17} />
             </button>
           </div>
         )}
+
+        <span className="topbar-sparkle" aria-hidden="true">
+          <Sparkles size={17} />
+        </span>
       </div>
     </header>
   );

@@ -251,3 +251,1199 @@ button:disabled {
     padding: 14px 14px !important;
   }
 }
+
+/* =========================================================
+   SAARTHI — Global Visual Polish
+   ========================================================= */
+
+body {
+  background:
+    radial-gradient(
+      ellipse at 85% 0%,
+      rgba(124, 58, 237, 0.055),
+      transparent 35%
+    ),
+    var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* Headings */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--text-primary);
+}
+
+/* Links */
+a {
+  transition:
+    color var(--transition-fast),
+    opacity var(--transition-fast);
+}
+
+a:hover {
+  color: var(--brand-hover);
+}
+
+/* Buttons */
+button {
+  transition:
+    background-color var(--transition-base),
+    border-color var(--transition-base),
+    box-shadow var(--transition-base),
+    transform var(--transition-fast);
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+/* Inputs */
+input,
+select,
+textarea {
+  border-color: var(--border);
+  transition:
+    border-color var(--transition-base),
+    box-shadow var(--transition-base);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px rgba(109, 92, 232, 0.12);
+  outline: none;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar-thumb {
+  background: #D5D0F0;
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #A9A0E4;
+}
+
+/* Reduced motion accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+
+
+/* ==========================================================
+   SAARTHI PREMIUM UI — SIDEBAR, CARDS, BUTTONS & TOPBAR
+   ========================================================== */
+
+:root {
+  --saarthi-navy: #17143B;
+  --saarthi-indigo: #39308F;
+  --saarthi-violet: #7452E8;
+  --saarthi-lavender: #F0EDFF;
+  --saarthi-glass: rgba(255, 255, 255, 0.88);
+}
+
+/* Dashboard background */
+body {
+  background-color: #F7F6FF;
+  background-image:
+    radial-gradient(ellipse at 90% 0%, rgba(116, 82, 232, 0.09), transparent 32%),
+    radial-gradient(ellipse at 0% 100%, rgba(102, 126, 234, 0.05), transparent 30%);
+}
+
+/* Premium dark sidebar */
+.saarthi-sidebar {
+  background: linear-gradient(
+    175deg,
+    #17143B 0%,
+    #25205B 58%,
+    #39308F 100%
+  ) !important;
+  color: #FFFFFF !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.09) !important;
+  box-shadow: 8px 0 32px rgba(23, 20, 59, 0.09);
+  transition: transform 260ms ease, box-shadow 260ms ease;
+}
+
+/* Sidebar text and icons */
+.saarthi-sidebar h1,
+.saarthi-sidebar h2,
+.saarthi-sidebar h3,
+.saarthi-sidebar p,
+.saarthi-sidebar span,
+.saarthi-sidebar label {
+  color: #F5F3FF;
+}
+
+/* Sidebar navigation */
+.saarthi-sidebar a,
+.saarthi-sidebar button {
+  border-radius: 10px;
+  transition:
+    background-color 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+.saarthi-sidebar a:hover,
+.saarthi-sidebar button:hover {
+  background: rgba(255, 255, 255, 0.10);
+  color: #FFFFFF;
+}
+
+/* Active navigation links */
+.saarthi-sidebar a[aria-current="page"],
+.saarthi-sidebar a[aria-current="true"],
+.saarthi-sidebar [data-active="true"] {
+  background: linear-gradient(
+    110deg,
+    rgba(139, 117, 255, 0.35),
+    rgba(116, 82, 232, 0.18)
+  ) !important;
+  color: #FFFFFF !important;
+  box-shadow: inset 3px 0 #B6A6FF;
+}
+
+/* Main content */
+.saarthi-main-wrapper {
+  background: transparent;
+}
+
+.saarthi-main-content {
+  background: transparent;
+}
+
+/* Clean, floating topbar */
+.saarthi-topbar {
+  background: rgba(255, 255, 255, 0.88) !important;
+  border-bottom: 1px solid #EAE7F7 !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+/* White cards */
+.saarthi-document-card,
+.saarthi-main-content [class*="card"],
+.saarthi-main-content [class*="Card"] {
+  border-color: #E8E4F5;
+  border-radius: 16px;
+  box-shadow: 0 3px 12px rgba(48, 37, 110, 0.045);
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.saarthi-document-card:hover {
+  border-color: #CEC5FF;
+  box-shadow: 0 10px 26px rgba(65, 49, 145, 0.09);
+  transform: translateY(-2px);
+}
+
+/* Primary action buttons */
+.saarthi-main-content button[class*="primary"],
+.saarthi-main-content button[class*="Primary"],
+.saarthi-main-content button[class*="brand"],
+.saarthi-main-content a[class*="primary"],
+.saarthi-main-content a[class*="Primary"] {
+  background: linear-gradient(135deg, #5145CD, #8656E8) !important;
+  color: #FFFFFF !important;
+  border: 1px solid transparent !important;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(81, 69, 205, 0.19);
+}
+
+.saarthi-main-content button[class*="primary"]:hover,
+.saarthi-main-content button[class*="Primary"]:hover,
+.saarthi-main-content button[class*="brand"]:hover,
+.saarthi-main-content a[class*="primary"]:hover,
+.saarthi-main-content a[class*="Primary"]:hover {
+  background: linear-gradient(135deg, #4035B3, #7043D5) !important;
+  box-shadow: 0 7px 18px rgba(81, 69, 205, 0.28);
+  transform: translateY(-1px);
+}
+
+/* Focused form fields */
+.saarthi-main-content input:focus,
+.saarthi-main-content select:focus,
+.saarthi-main-content textarea:focus {
+  border-color: #7452E8 !important;
+  box-shadow: 0 0 0 3px rgba(116, 82, 232, 0.13);
+  outline: none;
+}
+
+/* Smooth selection color */
+::selection {
+  background: #DDD6FE;
+  color: #211B45;
+}
+
+/* Mobile sidebar remains functional */
+@media (max-width: 768px) {
+  .saarthi-sidebar {
+    box-shadow: 12px 0 36px rgba(23, 20, 59, 0.20);
+  }
+
+  .saarthi-main-content [class*="card"],
+  .saarthi-main-content [class*="Card"] {
+    border-radius: 13px;
+  }
+}
+
+/* ==========================================================
+   SAARTHI MODERN SIDEBAR
+   ========================================================== */
+
+.saarthi-sidebar {
+  width: var(--sidebar-width);
+  height: 100dvh;
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 995;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  color: #F7F5FF;
+  background:
+    radial-gradient(ellipse at 0% 0%, rgba(123, 94, 255, .20), transparent 36%),
+    linear-gradient(165deg, #171537 0%, #201B50 55%, #292064 100%);
+  border-right: 1px solid rgba(255,255,255,.08);
+  box-shadow: 8px 0 35px rgba(26, 19, 74, .08);
+  transition: transform 260ms ease;
+}
+
+.saarthi-sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 990;
+  background: rgba(15, 12, 39, .55);
+  backdrop-filter: blur(3px);
+}
+
+.sidebar-brand {
+  min-height: 91px;
+  padding: 20px 19px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+
+.sidebar-brand-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  color: white !important;
+  text-decoration: none;
+}
+
+.sidebar-brand-icon {
+  width: 43px;
+  height: 43px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  color: white;
+  background: linear-gradient(145deg, #9B83FF, #6544E8 65%, #4F35C7);
+  box-shadow: 0 5px 18px rgba(119, 83, 245, .35);
+}
+
+.sidebar-brand-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sidebar-brand-name {
+  font-size: 18px;
+  line-height: 1.1;
+  letter-spacing: .09em;
+  font-weight: 800;
+  color: #FFFFFF;
+}
+
+.sidebar-brand-caption {
+  font-size: 10px;
+  letter-spacing: .035em;
+  color: #BDB7E9;
+  white-space: nowrap;
+}
+
+.sidebar-section-label {
+  padding: 28px 22px 12px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .16em;
+  color: #928BBF;
+}
+
+.sidebar-navigation {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 12px;
+}
+
+.sidebar-nav-link {
+  min-height: 47px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 13px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  color: #C5C1E4 !important;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background .2s ease, color .2s ease, border-color .2s ease;
+}
+
+.sidebar-nav-icon {
+  width: 23px;
+  height: 23px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  color: #A8A0DC;
+  transition: color .2s ease;
+}
+
+.sidebar-nav-label {
+  flex: 1;
+}
+
+.sidebar-nav-chevron {
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: opacity .2s ease, transform .2s ease;
+}
+
+.sidebar-nav-link:hover {
+  background: rgba(255,255,255,.065);
+  color: #FFFFFF !important;
+}
+
+.sidebar-nav-link:hover .sidebar-nav-icon {
+  color: #FFFFFF;
+}
+
+.sidebar-nav-link:hover .sidebar-nav-chevron {
+  opacity: .7;
+  transform: translateX(0);
+}
+
+.sidebar-nav-link.active {
+  color: #FFFFFF !important;
+  font-weight: 650;
+  background: linear-gradient(105deg, #7155EA, #5941C7);
+  border-color: rgba(197, 183, 255, .25);
+  box-shadow: 0 5px 16px rgba(79, 54, 189, .28);
+}
+
+.sidebar-nav-link.active .sidebar-nav-icon {
+  color: #FFFFFF;
+}
+
+.sidebar-nav-link.active .sidebar-nav-chevron {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.sidebar-bottom {
+  margin-top: auto;
+  padding: 20px 12px 10px;
+}
+
+.sidebar-privacy-card {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 12px;
+  border: 1px solid rgba(182, 166, 255, .17);
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(137, 111, 255, .13), rgba(255,255,255,.035));
+}
+
+.sidebar-privacy-icon {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: rgba(144, 119, 255, .18);
+  color: #C3B5FF;
+}
+
+.sidebar-privacy-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.sidebar-privacy-title {
+  font-size: 11px;
+  font-weight: 650;
+  color: #F4F0FF;
+}
+
+.sidebar-privacy-copy p {
+  margin-top: 5px;
+  font-size: 10px;
+  line-height: 1.55;
+  color: #B8B2D9;
+}
+
+.sidebar-privacy-check {
+  flex-shrink: 0;
+  color: #75DFC0;
+}
+
+.sidebar-profile {
+  margin-top: 16px;
+  padding: 14px 7px 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid rgba(255,255,255,.10);
+}
+
+.sidebar-profile-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.sidebar-profile-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 650;
+  color: #FFFFFF;
+}
+
+.sidebar-profile-subtitle {
+  margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+  color: #AAA4D1;
+}
+
+.sidebar-profile-status {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #4ED6A0;
+  box-shadow: 0 0 0 3px rgba(78,214,160,.12);
+}
+
+.sidebar-footer-note {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 0 4px;
+  font-size: 10px;
+  color: #928BBF;
+}
+
+.sidebar-footer-note svg {
+  color: #A997FF;
+}
+
+.sidebar-close-btn {
+  display: none;
+  color: white;
+  padding: 5px;
+}
+
+/* ==========================================================
+   SAARTHI MODERN TOPBAR
+   ========================================================== */
+
+.saarthi-topbar {
+  height: var(--topbar-height);
+  position: sticky;
+  top: 0;
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 0 28px;
+  background: rgba(255,255,255,.84);
+  border-bottom: 1px solid #EAE7F7;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.topbar-left,
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-width: 0;
+}
+
+.topbar-left {
+  flex: 1;
+}
+
+.topbar-search-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  max-width: 490px;
+  min-width: 0;
+}
+
+.topbar-search-icon {
+  position: absolute;
+  left: 15px;
+  color: #817AA8;
+  pointer-events: none;
+}
+
+.topbar-search-container input {
+  width: 100%;
+  height: 42px;
+  padding: 0 65px 0 43px;
+  border: 1px solid #E7E3F5;
+  border-radius: 13px;
+  outline: none;
+  background: #F8F7FC;
+  color: #211B45;
+  font-size: 12px;
+  transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
+}
+
+.topbar-search-container input::placeholder {
+  color: #9690B0;
+}
+
+.topbar-search-container input:focus {
+  background: #FFFFFF;
+  border-color: #9B8AF6;
+  box-shadow: 0 0 0 4px rgba(116,82,232,.09);
+}
+
+.topbar-search-shortcut {
+  position: absolute;
+  right: 11px;
+  padding: 3px 7px;
+  border: 1px solid #E7E3F5;
+  border-radius: 6px;
+  color: #928BAA;
+  background: #FFFFFF;
+  font-size: 9px;
+}
+
+.topbar-privacy-badge {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+  color: #655B91;
+  font-size: 11px;
+  font-weight: 550;
+}
+
+.topbar-verified-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  color: #16886F;
+  background: #E8F8F1;
+}
+
+.topbar-divider {
+  height: 28px;
+  width: 1px;
+  background: #E8E4F2;
+}
+
+.topbar-account {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.topbar-account-details {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.topbar-username {
+  max-width: 145px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #28214E;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.topbar-account-caption {
+  font-size: 10px;
+  color: #8D86A7;
+}
+
+.topbar-logout-btn {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #EBE7F6;
+  border-radius: 10px;
+  color: #77708F;
+  background: #FFFFFF;
+  transition: color .2s ease, background .2s ease, border-color .2s ease;
+}
+
+.topbar-logout-btn:hover {
+  color: #D34F68;
+  background: #FFF0F3;
+  border-color: #F7C9D3;
+}
+
+.topbar-sparkle {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 11px;
+  color: #7452E8;
+  background: #F0EDFF;
+}
+
+.topbar-menu-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid #E7E3F5;
+  border-radius: 11px;
+  color: #5145CD;
+  background: #FFFFFF;
+}
+
+/* ==========================================================
+   RESPONSIVE
+   ========================================================== */
+
+@media (max-width: 768px) {
+  .saarthi-sidebar {
+    transform: translateX(-100%);
+    box-shadow: 12px 0 36px rgba(23,20,59,.20);
+  }
+
+  .saarthi-sidebar.is-open {
+    transform: translateX(0);
+  }
+
+  .sidebar-close-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .topbar-menu-btn {
+    display: flex;
+  }
+
+  .saarthi-topbar {
+    padding: 0 14px;
+    gap: 10px;
+  }
+
+  .topbar-left,
+  .topbar-right {
+    gap: 10px;
+  }
+
+  .topbar-search-container {
+    max-width: 100%;
+  }
+
+  .topbar-privacy-badge,
+  .topbar-divider,
+  .topbar-account-caption,
+  .topbar-sparkle,
+  .topbar-search-shortcut {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .saarthi-topbar {
+    padding: 0 10px;
+  }
+
+  .topbar-account {
+    gap: 6px;
+  }
+
+  .topbar-username {
+    max-width: 85px;
+  }
+
+  .topbar-search-container input {
+    padding-right: 10px;
+    font-size: 11px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .saarthi-sidebar,
+  .sidebar-nav-link,
+  .topbar-search-container input {
+    transition: none;
+  }
+}
+
+/* ==========================================================
+   SAARTHI APP SHELL
+   ========================================================== */
+
+.saarthi-app-layout {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
+  background: #F7F6FF;
+}
+
+.saarthi-main-wrapper {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  width: calc(100% - var(--sidebar-width));
+  min-width: 0;
+  min-height: 100vh;
+  margin-left: var(--sidebar-width);
+  background:
+    radial-gradient(
+      ellipse at 85% 0%,
+      rgba(124, 58, 237, 0.065),
+      transparent 35%
+    ),
+    #F7F6FF;
+  transition: margin-left 260ms ease;
+}
+
+.saarthi-main-content {
+  flex: 1;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  margin: 0;
+  padding: 30px clamp(18px, 3vw, 42px) 48px;
+}
+
+.saarthi-page-container {
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+/* Consistent visual polish for page content */
+.saarthi-page-container h1 {
+  letter-spacing: -0.04em;
+}
+
+.saarthi-page-container h2,
+.saarthi-page-container h3 {
+  letter-spacing: -0.025em;
+}
+
+.saarthi-page-container button {
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    background-color 180ms ease;
+}
+
+.saarthi-page-container button:active:not(:disabled) {
+  transform: scale(0.985);
+}
+
+@media (max-width: 768px) {
+  .saarthi-main-wrapper {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .saarthi-main-content {
+    padding: 22px 16px 36px;
+  }
+}
+
+@media (max-width: 480px) {
+  .saarthi-main-content {
+    padding: 18px 12px 28px;
+  }
+}
+
+.topbar-theme-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid #E5E0F2;
+  border-radius: 10px;
+  background: #FFFFFF;
+  color: #6650B8;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.topbar-theme-btn:hover {
+  background: #F0ECFF;
+}
+
+:root[data-theme="dark"] .topbar-theme-btn {
+  background: #252238;
+  border-color: #45405D;
+  color: #E6E0FF;
+}
+
+:root[data-theme="dark"] .topbar-theme-btn:hover {
+  background: #34304D;
+}
+
+
+/* ===================================
+   SAARTHI - COMPLETE DARK THEME
+   Keeps the existing layout unchanged
+   =================================== */
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg-primary: #11111B;
+  --text-primary: #F4F2FF;
+  --text-secondary: #C4C0D8;
+  --text-muted: #A39DBB;
+  --border: #343147;
+  --border-focus: #9B83FF;
+}
+
+/* Main page and React application */
+:root[data-theme="dark"] body,
+:root[data-theme="dark"] #root {
+  background-color: #11111B;
+  color: #F4F2FF;
+}
+
+:root[data-theme="dark"] .saarthi-app-layout,
+:root[data-theme="dark"] .saarthi-main-wrapper,
+:root[data-theme="dark"] .saarthi-main-content {
+  background-color: #11111B;
+  color: #F4F2FF;
+}
+
+/* Page headings and normal text */
+:root[data-theme="dark"] h1,
+:root[data-theme="dark"] h2,
+:root[data-theme="dark"] h3,
+:root[data-theme="dark"] h4,
+:root[data-theme="dark"] h5,
+:root[data-theme="dark"] h6,
+:root[data-theme="dark"] label {
+  color: #F4F2FF;
+}
+
+:root[data-theme="dark"] p,
+:root[data-theme="dark"] small {
+  color: #C4C0D8;
+}
+
+/* Topbar */
+:root[data-theme="dark"] .saarthi-topbar {
+  background: #181628 !important;
+  border-bottom-color: #343147 !important;
+  color: #F4F2FF;
+}
+
+/* Cards and panels: same shape, darker colors */
+:root[data-theme="dark"] .saarthi-main-content [class*="card"],
+:root[data-theme="dark"] .saarthi-main-content [class*="Card"] {
+  background-color: #1C1A2B;
+  border-color: #343147;
+  color: #F4F2FF;
+}
+
+/* Form fields */
+:root[data-theme="dark"] input,
+:root[data-theme="dark"] select,
+:root[data-theme="dark"] textarea {
+  background-color: #201E31;
+  color: #F4F2FF;
+  border-color: #45405D;
+}
+
+:root[data-theme="dark"] input::placeholder,
+:root[data-theme="dark"] textarea::placeholder {
+  color: #A39DBB;
+}
+
+/* Tables */
+:root[data-theme="dark"] table,
+:root[data-theme="dark"] th,
+:root[data-theme="dark"] td {
+  border-color: #343147;
+  color: #F4F2FF;
+}
+
+:root[data-theme="dark"] th {
+  background-color: #252238;
+}
+
+/* Links */
+:root[data-theme="dark"] a {
+  color: #B9A7FF;
+}
+
+/* Secondary topbar buttons */
+:root[data-theme="dark"] .topbar-logout-btn,
+:root[data-theme="dark"] .topbar-menu-btn {
+  background-color: #252238;
+  border-color: #45405D;
+  color: #E6E0FF;
+}
+
+/* Keep the existing sidebar gradient */
+:root[data-theme="dark"] .saarthi-sidebar {
+  color: #F7F5FF;
+}
+
+
+/* ==========================================
+   DARK THEME - FIX BLACK TEXT AND CONTRAST
+   ========================================== */
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+/* Default text throughout the application */
+:root[data-theme="dark"] body,
+:root[data-theme="dark"] #root,
+:root[data-theme="dark"] #root * {
+  --dark-text-primary: #F4F2FF;
+  --dark-text-secondary: #D0CBE3;
+}
+
+/* Main text elements */
+:root[data-theme="dark"] h1,
+:root[data-theme="dark"] h2,
+:root[data-theme="dark"] h3,
+:root[data-theme="dark"] h4,
+:root[data-theme="dark"] h5,
+:root[data-theme="dark"] h6,
+:root[data-theme="dark"] p,
+:root[data-theme="dark"] span,
+:root[data-theme="dark"] label,
+:root[data-theme="dark"] li,
+:root[data-theme="dark"] td,
+:root[data-theme="dark"] th,
+:root[data-theme="dark"] strong,
+:root[data-theme="dark"] b,
+:root[data-theme="dark"] em,
+:root[data-theme="dark"] small {
+  color: #F0EDFF;
+}
+
+/* Secondary and muted text */
+:root[data-theme="dark"] .text-muted,
+:root[data-theme="dark"] .text-secondary,
+:root[data-theme="dark"] [class*="subtitle"],
+:root[data-theme="dark"] [class*="description"],
+:root[data-theme="dark"] [class*="caption"] {
+  color: #C4BEDB;
+}
+
+/* Cards, panels and content areas */
+:root[data-theme="dark"] .saarthi-main-content [class*="card"],
+:root[data-theme="dark"] .saarthi-main-content [class*="Card"],
+:root[data-theme="dark"] .saarthi-main-content [class*="panel"] {
+  color: #F0EDFF;
+}
+
+/* Text inside buttons */
+:root[data-theme="dark"] button {
+  color: #F0EDFF;
+}
+
+/* Input text and placeholders */
+:root[data-theme="dark"] input,
+:root[data-theme="dark"] select,
+:root[data-theme="dark"] textarea {
+  color: #F4F2FF;
+  caret-color: #B9A7FF;
+}
+
+:root[data-theme="dark"] input::placeholder,
+:root[data-theme="dark"] textarea::placeholder {
+  color: #B5AECF;
+  opacity: 1;
+}
+
+/* Keep links readable */
+:root[data-theme="dark"] a {
+  color: #C3B4FF;
+}
+
+/* Keep the existing sidebar appearance */
+:root[data-theme="dark"] .saarthi-sidebar {
+  color: #F7F5FF;
+}
+
+
+/* ==========================================
+   SAARTHI - DARK MODE CONTRAST FIX
+   ========================================== */
+
+/* Main dashboard */
+:root[data-theme="dark"] .saarthi-main-wrapper,
+:root[data-theme="dark"] .saarthi-main-content {
+  background-color: #11111B !important;
+  color: #F4F2FF !important;
+}
+
+/* Dashboard cards, including white statistic cards */
+:root[data-theme="dark"] .saarthi-main-content [class*="card"],
+:root[data-theme="dark"] .saarthi-main-content [class*="Card"],
+:root[data-theme="dark"] .saarthi-main-content [class*="stat"],
+:root[data-theme="dark"] .saarthi-main-content [class*="Stat"] {
+  background-color: #201E31 !important;
+  color: #F4F2FF !important;
+  border-color: #39344F !important;
+}
+
+/* Text inside cards and dashboard panels */
+:root[data-theme="dark"] .saarthi-main-content [class*="card"] *,
+:root[data-theme="dark"] .saarthi-main-content [class*="Card"] *,
+:root[data-theme="dark"] .saarthi-main-content [class*="stat"] *,
+:root[data-theme="dark"] .saarthi-main-content [class*="Stat"] * {
+  color: #F0EDFF;
+}
+
+/* Main headings */
+:root[data-theme="dark"] .saarthi-main-content h1,
+:root[data-theme="dark"] .saarthi-main-content h2,
+:root[data-theme="dark"] .saarthi-main-content h3 {
+  color: #FFFFFF !important;
+}
+
+/* Supporting text */
+:root[data-theme="dark"] .saarthi-main-content p,
+:root[data-theme="dark"] .saarthi-main-content small {
+  color: #C8C2DF !important;
+}
+
+/* Inputs and search fields */
+:root[data-theme="dark"] .saarthi-main-content input,
+:root[data-theme="dark"] .saarthi-main-content select,
+:root[data-theme="dark"] .saarthi-main-content textarea,
+:root[data-theme="dark"] .saarthi-topbar input {
+  background-color: #201E31 !important;
+  color: #F4F2FF !important;
+  border-color: #45405D !important;
+}
+
+:root[data-theme="dark"] input::placeholder,
+:root[data-theme="dark"] textarea::placeholder {
+  color: #B5AECF !important;
+  opacity: 1;
+}
+
+/* Document details */
+:root[data-theme="dark"] .saarthi-main-content table,
+:root[data-theme="dark"] .saarthi-main-content th,
+:root[data-theme="dark"] .saarthi-main-content td {
+  color: #F0EDFF;
+  border-color: #39344F;
+}
+
+/* Preserve status badge backgrounds and colors */
+:root[data-theme="dark"] .saarthi-main-content [class*="badge"],
+:root[data-theme="dark"] .saarthi-main-content [class*="Badge"],
+:root[data-theme="dark"] .saarthi-main-content [class*="status"],
+:root[data-theme="dark"] .saarthi-main-content [class*="Status"] {
+  color: #D8D2EF;
+}
+
+/* Topbar search button */
+:root[data-theme="dark"] .saarthi-topbar button {
+  color: #F4F2FF;
+}
+
+
+/* ==========================================
+   DARK MODE - TOP MATCHED OPPORTUNITIES
+   ========================================== */
+
+/* Section container */
+:root[data-theme="dark"] .saarthi-main-content [class*="opportunit"] {
+  color: #F4F2FF;
+}
+
+/* Individual opportunity cards */
+:root[data-theme="dark"] .saarthi-main-content [class*="opportunit"] [class*="card"],
+:root[data-theme="dark"] .saarthi-main-content [class*="opportunit"] [class*="item"] {
+  background: #201E31 !important;
+  border-color: #403A59 !important;
+  color: #F4F2FF !important;
+}
+
+/* All text inside opportunity cards */
+:root[data-theme="dark"] .saarthi-main-content [class*="opportunit"] [class*="card"] *,
+:root[data-theme="dark"] .saarthi-main-content [class*="opportunit"] [class*="item"] * {
+  color: #EAE6FF;
+}
+
+/* Organization names */
+:root[data-theme="dark"] .saarthi-main-content [class*="opportunit"] h3,
+:root[data-theme="dark"] .saarthi-main-content [class*="opportunit"] h4 {
+  color: #FFFFFF !important;
+}
+
+/* Descriptions and deadlines */
+:root[data-theme="dark"] .saarthi-main-content [class*="opportunit"] p,
+:root[data-theme="dark"] .saarthi-main-content [class*="opportunit"] small {
+  color: #C8C2DF !important;
+}
+
+/* Links and action buttons */
+:root[data-theme="dark"] .saarthi-main-content [class*="opportunit"] a {
+  color: #C3B4FF;
+}
+
+/* Preserve green eligibility status text */
+:root[data-theme="dark"] .saarthi-main-content [class*="opportunit"] [class*="badge"],
+:root[data-theme="dark"] .saarthi-main-content [class*="opportunit"] [class*="status"] {
+  color: #A7F3D0 !important;
+}

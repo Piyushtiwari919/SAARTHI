@@ -1,58 +1,74 @@
-:root {
-  /* ==========================================================================
-     Saarthi Color Tokens
-     ========================================================================== */
-  --bg-primary: #F7F6F2;
-  --surface: #FFFFFF;
-  --surface-muted: #F1F2EE;
-  --surface-subtle: #F9F9F7;
 
-  --text-primary: #18201D;
-  --text-secondary: #68716C;
-  --text-muted: #8B938E;
+:root {
+  /* =========================================================
+     SAARTHI — Premium Indigo & Violet Theme
+     ========================================================= */
+
+  /* Backgrounds */
+  --bg-primary: #F6F5FF;
+  --surface: #FFFFFF;
+  --surface-muted: #F0EEFF;
+  --surface-subtle: #FAF9FF;
+
+  /* Typography */
+  --text-primary: #211B45;
+  --text-secondary: #625D7D;
+  --text-muted: #918CA8;
   --text-inverse: #FFFFFF;
 
-  --brand-primary: #236B5A;
-  --brand-hover: #1B594B;
-  --brand-light: #EBF3F0;
-  --brand-surface: #F3F8F6;
-  --brand-border: #D1E4DD;
+  /* Primary Brand */
+  --brand-primary: #5145CD;
+  --brand-hover: #4035B3;
+  --brand-light: #EAE8FF;
+  --brand-surface: #F4F2FF;
+  --brand-border: #D8D3FF;
 
-  --accent-warm: #D99A32;
-  --accent-warm-light: #FAF4E8;
-  --accent-warm-border: #F1DFBE;
+  /* Additional Accent Colors */
+  --accent-warm: #E99A43;
+  --accent-warm-light: #FFF5E8;
+  --accent-warm-border: #F7DDBA;
 
-  --success: #2F7D5A;
-  --success-light: #EAF4EF;
-  --success-border: #CFE7DC;
+  /* Success */
+  --success: #0F8A70;
+  --success-light: #E5F7F1;
+  --success-border: #BDE9D9;
 
-  --warning: #C48A25;
-  --warning-light: #FBF4E7;
-  --warning-border: #F3DFC0;
+  /* Warning */
+  --warning: #B7791F;
+  --warning-light: #FFF7E6;
+  --warning-border: #F3DCA8;
 
-  --danger: #C95A51;
-  --danger-light: #FBF0EF;
-  --danger-border: #F3D0CD;
+  /* Danger */
+  --danger: #D34F68;
+  --danger-light: #FFF0F3;
+  --danger-border: #F7C9D3;
 
-  --border: #E3E5E0;
-  --border-subtle: #ECEEEA;
-  --border-focus: #236B5A;
+  /* Borders and Focus */
+  --border: #E5E2F2;
+  --border-subtle: #F0EDF8;
+  --border-focus: #6D5CE8;
 
-  /* ==========================================================================
+  /* Gradients — use where suitable in component styles */
+  --gradient-brand: linear-gradient(135deg, #5145CD 0%, #8656E8 100%);
+  --gradient-soft: linear-gradient(135deg, #F2EFFF 0%, #E8F0FF 100%);
+  --gradient-accent: linear-gradient(135deg, #7C3AED 0%, #5145CD 100%);
+
+  /* =========================================================
      Typography
-     ========================================================================== */
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+     ========================================================= */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont,
+    'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
 
-  --text-xs: 0.75rem;    /* 12px */
-  --text-sm: 0.8125rem;  /* 13px */
-  --text-base: 0.9375rem;/* 15px */
-  --text-md: 1rem;       /* 16px */
-  --text-lg: 1.125rem;   /* 18px */
-  --text-xl: 1.25rem;    /* 20px */
-  --text-2xl: 1.5rem;    /* 24px */
-  --text-3xl: 1.875rem;  /* 30px */
-  --text-4xl: 2.25rem;   /* 36px */
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.9375rem;
+  --text-md: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --text-4xl: 2.25rem;
 
   --font-normal: 400;
   --font-medium: 500;
@@ -63,52 +79,53 @@
   --leading-normal: 1.5;
   --leading-relaxed: 1.65;
 
-  /* ==========================================================================
-     Spacing Rhythm (8px based)
-     ========================================================================== */
-  --space-0-5: 0.125rem; /* 2px */
-  --space-1: 0.25rem;    /* 4px */
-  --space-1-5: 0.375rem; /* 6px */
-  --space-2: 0.5rem;     /* 8px */
-  --space-2-5: 0.625rem; /* 10px */
-  --space-3: 0.75rem;    /* 12px */
-  --space-4: 1rem;       /* 16px */
-  --space-5: 1.25rem;    /* 20px */
-  --space-6: 1.5rem;     /* 24px */
-  --space-8: 2rem;       /* 32px */
-  --space-10: 2.5rem;    /* 40px */
-  --space-12: 3rem;      /* 48px */
-  --space-16: 4rem;      /* 64px */
+  /* =========================================================
+     Spacing
+     ========================================================= */
+  --space-0-5: 0.125rem;
+  --space-1: 0.25rem;
+  --space-1-5: 0.375rem;
+  --space-2: 0.5rem;
+  --space-2-5: 0.625rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
 
-  /* ==========================================================================
+  /* =========================================================
      Component Radii
-     ========================================================================== */
-  --radius-xs: 4px;
-  --radius-sm: 6px;
-  --radius-btn: 9px;
-  --radius-input: 9px;
-  --radius-card: 12px;
-  --radius-lg: 14px;
+     ========================================================= */
+  --radius-xs: 5px;
+  --radius-sm: 8px;
+  --radius-btn: 10px;
+  --radius-input: 10px;
+  --radius-card: 16px;
+  --radius-lg: 20px;
   --radius-full: 9999px;
 
-  /* ==========================================================================
-     Shadows (Restrained & Architectural)
-     ========================================================================== */
-  --shadow-subtle: 0 1px 2px rgba(24, 32, 29, 0.04);
-  --shadow-sm: 0 1px 3px rgba(24, 32, 29, 0.05), 0 1px 2px rgba(24, 32, 29, 0.03);
-  --shadow-md: 0 4px 12px -2px rgba(24, 32, 29, 0.06), 0 2px 4px -1px rgba(24, 32, 29, 0.04);
-  --shadow-lg: 0 10px 24px -4px rgba(24, 32, 29, 0.08), 0 4px 8px -2px rgba(24, 32, 29, 0.03);
+  /* =========================================================
+     Soft, Premium Shadows
+     ========================================================= */
+  --shadow-subtle: 0 1px 3px rgba(49, 38, 112, 0.04);
+  --shadow-sm: 0 2px 5px rgba(49, 38, 112, 0.05);
+  --shadow-md: 0 6px 18px rgba(49, 38, 112, 0.08);
+  --shadow-lg: 0 14px 34px rgba(49, 38, 112, 0.12);
+  --shadow-brand: 0 6px 18px rgba(81, 69, 205, 0.22);
 
-  /* ==========================================================================
+  /* =========================================================
      Transitions
-     ========================================================================== */
+     ========================================================= */
   --transition-fast: 120ms ease;
   --transition-base: 180ms ease;
   --transition-slow: 260ms ease;
 
-  /* ==========================================================================
-     Layout
-     ========================================================================== */
+  /* =========================================================
+     Layout — original dimensions preserved
+     ========================================================= */
   --sidebar-width: 252px;
   --topbar-height: 64px;
   --max-content-width: 1240px;

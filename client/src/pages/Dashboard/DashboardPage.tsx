@@ -132,12 +132,20 @@ export const DashboardPage: React.FC = () => {
   }
 
   // Map opportunity ID to eligibility result
-  const eligibilityMap = new Map(eligibilitySummaries.map((e) => [e.opportunityId, e]));
+  const eligibilityMap = new Map( eligibilitySummaries.map((item) => [item.opportunityId, item]));
 
   // Documents processing count
   const processingCount = documents.filter(
-    (d) => d.status !== 'READY' && d.status !== 'FAILED'
+    (doc) => doc.status !== 'READY' && doc.status !== 'FAILED'
   ).length;
+
+  const eligibleCount = (eligibilitySummaries ?? []).filter(
+  (item) => item.overallStatus === 'ELIGIBLE'
+).length;
+
+const inReviewCount = (eligibilitySummaries ?? []).filter(
+  (item) => item.overallStatus === 'IN_REVIEW'
+).length;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
@@ -182,8 +190,8 @@ export const DashboardPage: React.FC = () => {
             {opportunities.length}
           </div>
           <div style={{ fontSize: 'var(--text-xs)', color: 'var(--success)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <span>2 Verified Eligible</span>
-            <span style={{ color: 'var(--text-muted)' }}>• 1 In Review</span>
+            <span>{eligibleCount} Verified Eligible</span>
+            <span style={{ color: 'var(--text-muted)' }}>• {inReviewCount} In Review</span>
           </div>
         </Card>
 
