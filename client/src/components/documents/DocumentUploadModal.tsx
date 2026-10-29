@@ -18,13 +18,29 @@ const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
 const ALLOWED_EXTENSIONS = ['.pdf', '.jpg', '.jpeg', '.png'];
 const ALLOWED_MIME_TYPES = ['application/pdf', 'image/jpeg', 'image/png'];
 
+export function inferCategoryFromFilename(fileName: string): DocumentType {
+  const lower = fileName.toLowerCase();
+  if (/income/i.test(lower)) return 'INCOME_CERTIFICATE';
+  if (/scholarship|notice|circular|guideline/i.test(lower)) return 'SCHOLARSHIP_NOTICE';
+  if (/marksheet|mark_sheet|grade_card|transcript/i.test(lower)) return 'MARKSHEET';
+  if (/bonafide/i.test(lower)) return 'BONAFIDE_CERTIFICATE';
+  if (/domicile|residence/i.test(lower)) return 'DOMICILE_CERTIFICATE';
+  if (/caste|category_cert/i.test(lower)) return 'CASTE_CERTIFICATE';
+  if (/fee_receipt|receipt/i.test(lower)) return 'FEE_RECEIPT';
+  if (/admission|allotment/i.test(lower)) return 'ADMISSION_LETTER';
+  if (/aadhaar|aadhar|identity|pan_card/i.test(lower)) return 'IDENTITY_PROOF';
+  if (/bank|passbook/i.test(lower)) return 'BANK_DOCUMENT';
+  return 'OTHER';
+}
+
 export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   isOpen,
   onClose,
   onUpload,
 }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [category, setCategory] = useState<DocumentType>('MARKSHEET');
+  const [category, setCategory] = useState<DocumentType>('OTHER');
+  const [hasManuallySelectedCategory, setHasManuallySelectedCategory] = useState(false);
   const [customTitle, setCustomTitle] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -34,7 +50,8 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
 
   const resetForm = () => {
     setSelectedFile(null);
-    setCategory('MARKSHEET');
+    setCategory('OTHER');
+    setHasManuallySelectedCategory(false);
     setCustomTitle('');
     setValidationError(null);
     setIsDragging(false);
@@ -67,6 +84,9 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
     }
 
     setSelectedFile(file);
+    if (!hasManuallySelectedCategory) {
+      setCategory(inferCategoryFromFilename(file.name));
+    }
     if (!customTitle) {
       // Auto-populate human title from file name
       setCustomTitle(file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' '));
@@ -142,7 +162,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
       isOpen={isOpen}
       onClose={handleClose}
       title="Upload Document to Vault"
-      description="Add an academic certificate or scholarship document for criteria extraction."
+      description="Add an academic certificate, registration form, or scholarship notice for extraction and Q&A."
       maxWidth="540px"
     >
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
@@ -151,14 +171,17 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
           label="Document Type"
           options={categoryOptions}
           value={category}
-          onChange={(e) => setCategory(e.target.value as DocumentType)}
+          onChange={(e) => {
+            setCategory(e.target.value as DocumentType);
+            setHasManuallySelectedCategory(true);
+          }}
           required
         />
 
         {/* Custom Title Input */}
         <Input
           label="Document Label / Title (Optional)"
-          placeholder="e.g. Semester 4 Marksheet, Tehsildar Income Certificate"
+          placeholder="e.g. AKTU Exam Form, Semester 4 Marksheet, Income Certificate"
           value={customTitle}
           onChange={(e) => setCustomTitle(e.target.value)}
           helperText="A recognizable label to identify this document in your vault"
@@ -318,7 +341,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
         >
           <Lock size={15} style={{ color: 'var(--brand-primary)', flexShrink: 0, marginTop: '2px' }} />
           <span>
-            <strong>Your document is private.</strong> Upload only the documents you are comfortable processing. Extracted text is used solely for checking scholarship eligibility criteria.
+            <strong>Your document is private.</strong> Upload only the documents you are comfortable processing. Extracted text is used solely for checking scholarship eligibility criteria and answering your questions.
           </span>
         </div>
 

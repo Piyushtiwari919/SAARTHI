@@ -159,16 +159,60 @@ export class EligibilityRepository {
 
       if (doc.extractedAttributes && doc.extractedAttributes.length > 0) {
         for (const attr of doc.extractedAttributes) {
+          // Skip NOT_FOUND, empty, or companion currency fields
+          if (
+            attr.status === 'NOT_FOUND' ||
+            attr.value === null ||
+            attr.value === undefined ||
+            String(attr.value).trim() === '' ||
+            attr.field === 'currency'
+          ) {
+            continue;
+          }
+
+          const sourceDocId = doc.id || doc._id.toString();
           evidence.push({
             field: attr.field,
             value: attr.value,
             confidence: attr.confidence,
-            sourceDocumentId: doc.id || doc._id.toString(),
+            sourceDocumentId: sourceDocId,
             sourcePage: attr.sourcePage,
             evidenceSnippet: attr.evidenceSnippet,
             status: (attr.status as any) || 'EXTRACTED',
             verifiedByUser: attr.verifiedByUser,
           });
+
+          // Map class_xii_percentage to percentage if percentage isn't separately present
+          if (attr.field === 'class_xii_percentage') {
+            evidence.push({
+              field: 'percentage',
+              value: attr.value,
+              unit: '%',
+              confidence: attr.confidence,
+              sourceDocumentId: sourceDocId,
+              sourcePage: attr.sourcePage,
+              evidenceSnippet: attr.evidenceSnippet,
+              status: (attr.status as any) || 'EXTRACTED',
+              verifiedByUser: attr.verifiedByUser,
+            });
+          }
+
+          // Map bachelor/undergraduate course to course_type
+          if (
+            attr.field === 'course' &&
+            /bachelor|b\.?\s*tech|undergraduate/i.test(String(attr.value))
+          ) {
+            evidence.push({
+              field: 'course_type',
+              value: 'B.Tech',
+              confidence: attr.confidence,
+              sourceDocumentId: sourceDocId,
+              sourcePage: attr.sourcePage,
+              evidenceSnippet: attr.evidenceSnippet,
+              status: (attr.status as any) || 'EXTRACTED',
+              verifiedByUser: attr.verifiedByUser,
+            });
+          }
         }
       }
     }
@@ -299,4 +343,3 @@ export class EligibilityRepository {
 }
 
 export const eligibilityRepository = new EligibilityRepository();
-

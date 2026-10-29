@@ -1,34 +1,87 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../../components/layout/PageHeader.tsx';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card.tsx';
+import { Button } from '../../components/ui/Button.tsx';
+import { Badge } from '../../components/ui/Badge.tsx';
 import { EligibilityStatusBadge } from '../../components/eligibility/EligibilityStatusBadge.tsx';
 import { LoadingState } from '../../components/ui/LoadingState.tsx';
 import { EmptyState } from '../../components/ui/EmptyState.tsx';
-import { FileText, CheckCircle2, XCircle, HelpCircle, ShieldCheck } from 'lucide-react';
+import {
+  FileText,
+  CheckCircle2,
+  XCircle,
+  HelpCircle,
+  ShieldCheck,
+  PlayCircle,
+  Upload,
+  BookOpen,
+} from 'lucide-react';
 import { eligibilityService } from '../../services/eligibility.service.ts';
+import { useToast } from '../../hooks/useToast.ts';
 import type { OpportunityEligibility, EligibilityRequirement } from '../../types/eligibility.ts';
 
 export const EligibilityPage: React.FC = () => {
   const [eligibilityList, setEligibilityList] = useState<OpportunityEligibility[]>([]);
   const [selectedEvaluation, setSelectedEvaluation] = useState<OpportunityEligibility | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isEvaluating, setIsEvaluating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    eligibilityService
-      .getAllEligibilitySummaries()
-      .then((list) => {
-        setEligibilityList(list);
-        if (list.length > 0) {
-          setSelectedEvaluation(list[0]);
-        }
-        setIsLoading(false);
-      })
-      .catch((err) => {
-        setError(err?.message || 'Could not load eligibility evaluations from server.');
-        setIsLoading(false);
-      });
+  const navigate = useNavigate();
+  const toast = useToast();
+
+  const loadEvaluations = useCallback(async () => {
+    try {
+      const list = await eligibilityService.getAllEligibilitySummaries();
+      setEligibilityList(list);
+      if (list.length > 0) {
+        setSelectedEvaluation((prev) => {
+          if (!prev) return list[0];
+          const updated = list.find((item) => item.opportunityId === prev.opportunityId);
+          return updated || list[0];
+        });
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Could not load eligibility evaluations from server.');
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    loadEvaluations();
+  }, [loadEvaluations]);
+
+  const handleEvaluateSingle = async (oppId: string) => {
+    setIsEvaluating(true);
+    try {
+      const res = await eligibilityService.evaluateOpportunity(oppId);
+      toast.success(`Evaluated ${res.opportunityTitle}: ${res.overallStatus}`, 'Evaluation Complete');
+      await loadEvaluations();
+      setSelectedEvaluation(res);
+    } catch (err: any) {
+      toast.error(err?.message || 'Evaluation failed');
+    } finally {
+      setIsEvaluating(false);
+    }
+  };
+
+  const handleEvaluateAll = async () => {
+    setIsEvaluating(true);
+    try {
+      const list = await eligibilityService.evaluateAllOpportunities();
+      setEligibilityList(list);
+      if (list.length > 0) {
+        setSelectedEvaluation(list[0]);
+      }
+      toast.success(`Evaluated all active opportunities against verified evidence!`, 'Evaluations Updated');
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to evaluate opportunities');
+    } finally {
+      setIsEvaluating(false);
+    }
+  };
 
   if (isLoading) {
     return <LoadingState message="Loading structured eligibility rules & audit trails..." fullHeight />;
@@ -48,10 +101,31 @@ export const EligibilityPage: React.FC = () => {
   };
 
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       <PageHeader
         title="Eligibility Audit & Verification"
         description="Transparent rule-by-rule audit showing verified mathematical comparisons and source document page citations."
+        actions={
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleEvaluateAll}
+              isLoading={isEvaluating}
+              leftIcon={<PlayCircle size={15} />}
+            >
+              Run Full Audit
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => navigate('/app/documents')}
+              leftIcon={<Upload size={15} />}
+            >
+              Upload More Evidence
+            </Button>
+          </div>
+        }
       />
 
       {error ? (
@@ -65,15 +139,25 @@ export const EligibilityPage: React.FC = () => {
         <EmptyState
           icon={<FileText size={40} />}
           title="No eligibility evaluations available"
-          description="Upload personal and educational documents in My Documents to view automated rule-engine assessments."
+          description="Click 'Run Full Audit' to compare your uploaded personal & educational documents against opportunity rules."
+          action={
+            <Button variant="primary" onClick={handleEvaluateAll} isLoading={isEvaluating} leftIcon={<PlayCircle size={16} />}>
+              Evaluate Available Opportunities
+            </Button>
+          }
         />
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px', alignItems: 'start' }}>
           {/* Left Column: List of Evaluated Opportunities */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <h3 style={{ fontSize: 'var(--text-md)', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>
-              Evaluated Opportunities ({eligibilityList.length})
-            </h3>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+              <h3 style={{ fontSize: 'var(--text-md)', fontWeight: 600, color: 'var(--text-secondary)', margin: 0 }}>
+                Evaluated Opportunities ({eligibilityList.length})
+              </h3>
+              <Badge variant="neutral" size="sm">
+                Rule Engine
+              </Badge>
+            </div>
 
             {eligibilityList.map((evalItem) => {
               const isSelected = selectedEvaluation?.opportunityId === evalItem.opportunityId;
@@ -88,17 +172,26 @@ export const EligibilityPage: React.FC = () => {
                     backgroundColor: isSelected ? 'var(--surface)' : 'var(--surface-muted)',
                     padding: '16px',
                     boxShadow: isSelected ? 'var(--shadow-md)' : 'none',
+                    transition: 'all var(--transition-fast)',
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px' }}>
-                    <h4 style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    <h4 style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
                       {evalItem.opportunityTitle}
                     </h4>
                     <EligibilityStatusBadge status={evalItem.overallStatus} size="sm" />
                   </div>
-                  <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', marginTop: '6px', margin: 0 }}>
+                  <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', marginTop: '8px', margin: 0 }}>
                     {evalItem.summary}
                   </p>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '10px', fontSize: '11px', color: 'var(--text-muted)' }}>
+                    <span>{evalItem.requirements.length} Rules Checked</span>
+                    {evalItem.missingDocuments.length > 0 && (
+                      <span style={{ color: 'var(--warning)', fontWeight: 500 }}>
+                        {evalItem.missingDocuments.length} missing docs
+                      </span>
+                    )}
+                  </div>
                 </Card>
               );
             })}
@@ -118,7 +211,18 @@ export const EligibilityPage: React.FC = () => {
                         {selectedEvaluation.opportunityTitle}
                       </CardTitle>
                     </div>
-                    <EligibilityStatusBadge status={selectedEvaluation.overallStatus} size="md" />
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => handleEvaluateSingle(selectedEvaluation.opportunityId)}
+                        isLoading={isEvaluating}
+                        leftIcon={<PlayCircle size={14} />}
+                      >
+                        Re-Audit
+                      </Button>
+                      <EligibilityStatusBadge status={selectedEvaluation.overallStatus} size="md" />
+                    </div>
                   </div>
                   <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', marginTop: '8px', margin: 0 }}>
                     {selectedEvaluation.summary}
@@ -126,7 +230,7 @@ export const EligibilityPage: React.FC = () => {
                 </CardHeader>
 
                 <CardContent style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                  <h4 style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  <h4 style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
                     Rule-by-Rule Criteria Check
                   </h4>
 
@@ -175,7 +279,8 @@ export const EligibilityPage: React.FC = () => {
                           <div>
                             <span style={{ color: 'var(--text-muted)' }}>Actual Evidence: </span>
                             <strong style={{ color: req.status === 'PASS' ? 'var(--success)' : 'var(--text-primary)' }}>
-                              {req.actualValue != null ? String(req.actualValue) : 'Not extracted'} {req.unit && req.actualValue != null ? ` ${req.unit}` : ''}
+                              {req.actualValue != null ? String(req.actualValue) : 'Not extracted'}{' '}
+                              {req.unit && req.actualValue != null ? ` ${req.unit}` : ''}
                             </strong>
                           </div>
                         </div>
@@ -185,8 +290,17 @@ export const EligibilityPage: React.FC = () => {
                         </p>
 
                         {(req.sourceDocumentName || req.sourceDocumentId) && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--brand-primary)', marginTop: '2px' }}>
-                            <FileText size={12} />
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              fontSize: '11px',
+                              color: 'var(--brand-primary)',
+                              marginTop: '2px',
+                            }}
+                          >
+                            <BookOpen size={12} />
                             <span>
                               Evidence Source: {req.sourceDocumentName || `Document ID: ${req.sourceDocumentId}`}{' '}
                               {req.sourcePage ? `(Page ${req.sourcePage})` : ''}
@@ -208,14 +322,26 @@ export const EligibilityPage: React.FC = () => {
                         border: '1px solid var(--warning-border)',
                         display: 'flex',
                         alignItems: 'center',
+                        justifyContent: 'space-between',
                         gap: '10px',
+                        flexWrap: 'wrap',
                       }}
                     >
-                      <HelpCircle size={18} style={{ color: 'var(--warning)', flexShrink: 0 }} />
-                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
-                        <strong>Missing required document:</strong>{' '}
-                        {selectedEvaluation.missingDocuments.join(', ')} required to complete final submission.
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <HelpCircle size={18} style={{ color: 'var(--warning)', flexShrink: 0 }} />
+                        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
+                          <strong>Missing required document:</strong>{' '}
+                          {selectedEvaluation.missingDocuments.join(', ')} required to complete final submission.
+                        </span>
+                      </div>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => navigate('/app/documents')}
+                        leftIcon={<Upload size={14} />}
+                      >
+                        Upload Document
+                      </Button>
                     </div>
                   )}
                 </CardContent>
@@ -233,7 +359,7 @@ export const EligibilityPage: React.FC = () => {
               >
                 <ShieldCheck size={14} style={{ color: 'var(--brand-primary)' }} />
                 <span>
-                  Preliminary automated assessment based on available evidence, not an official government decision.
+                  Preliminary automated assessment based on verified mathematical comparisons, not an official government decision.
                 </span>
               </div>
             </div>

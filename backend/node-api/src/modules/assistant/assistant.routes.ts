@@ -8,10 +8,10 @@ export const assistantRouter = Router();
 assistantRouter.use(authenticate);
 
 /**
- * POST /api/v1/assistant/query
+ * POST /api/v1/assistant/query (and /questions)
  * Source-grounded question answering over an authorized scholarship notice.
  */
-assistantRouter.post('/query', async (req: Request, res: Response, next: NextFunction) => {
+const handleQuery = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = req.user!.id;
     const { documentId, question, topK } = req.body;
@@ -21,7 +21,10 @@ assistantRouter.post('/query', async (req: Request, res: Response, next: NextFun
   } catch (err) {
     next(err);
   }
-});
+};
+
+assistantRouter.post('/query', handleQuery);
+assistantRouter.post('/questions', handleQuery);
 
 /**
  * POST /api/v1/assistant/index/:documentId
@@ -40,10 +43,10 @@ assistantRouter.post('/index/:documentId', async (req: Request, res: Response, n
 });
 
 /**
- * GET /api/v1/assistant/documents
+ * GET /api/v1/assistant/documents (and /notices)
  * List available scholarship notices belonging to the student with indexing status.
  */
-assistantRouter.get('/documents', async (req: Request, res: Response, next: NextFunction) => {
+const handleListDocuments = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = req.user!.id;
     const list = await AssistantService.getAvailableNotices(userId);
@@ -51,14 +54,15 @@ assistantRouter.get('/documents', async (req: Request, res: Response, next: Next
   } catch (err) {
     next(err);
   }
-});
+};
+
+assistantRouter.get('/documents', handleListDocuments);
+assistantRouter.get('/notices', handleListDocuments);
 
 /**
  * GET /api/v1/assistant/conversations
  * Retrieve conversation sessions for user.
  */
-assistantRouter.get('/conversations', async (req: Request, res: Response) => {
-  // Returns clean session format
+assistantRouter.get('/conversations', async (_req: Request, res: Response) => {
   res.status(200).json([]);
 });
-

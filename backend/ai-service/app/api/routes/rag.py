@@ -1,7 +1,7 @@
 """Internal RAG API endpoints for service-to-service communication with Node.js."""
 
 import logging
-from fastapi import APIRouter, Depends, File, Form, Header, UploadFile
+from fastapi import APIRouter, Depends, File, Form, UploadFile
 
 from app.api.routes.extraction import verify_internal_token
 from app.core.config import Settings, get_settings
@@ -36,14 +36,18 @@ def get_rag_service(settings: Settings = Depends(get_settings)) -> RAGService:
     "/index",
     response_model=RAGIndexResponse,
     dependencies=[Depends(verify_internal_token)],
-    summary="Index a scholarship notice into vector store",
-    description="Internal endpoint to chunk, embed, and store a SCHOLARSHIP_NOTICE document.",
+    summary="Index a document into vector store",
+    description="Internal endpoint to chunk, embed, and store a document with strict document_id isolation.",
 )
 async def index_document(
     file: UploadFile = File(..., description="Document binary file (PDF, JPEG, PNG)"),
     document_id: str = Form(..., description="Unique document ID from database"),
     document_title: str = Form(..., description="Display title for the document"),
-    category: str = Form(..., description="Must be SCHOLARSHIP_NOTICE"),
+    category: str = Form(..., description="Document category"),
+    allow_personal_document: bool = Form(
+        False,
+        description="Set to true when indexing an authenticated user's owned document for Mode A Q&A",
+    ),
     rag_service: RAGService = Depends(get_rag_service),
     settings: Settings = Depends(get_settings),
 ) -> RAGIndexResponse:
@@ -60,6 +64,7 @@ async def index_document(
         file_bytes=file_bytes,
         file_format=file_format,
         category=category,
+        allow_personal_document=allow_personal_document,
     )
 
 
@@ -67,8 +72,8 @@ async def index_document(
     "/query",
     response_model=RAGQueryResponse,
     dependencies=[Depends(verify_internal_token)],
-    summary="Ask a source-grounded question against an indexed scholarship notice",
-    description="Internal endpoint for vector retrieval and grounded LLM synthesis.",
+    summary="Ask a source-grounded question against an indexed document",
+    description="Internal endpoint for vector retrieval and grounded synthesis.",
 )
 async def query_document(
     request: RAGQueryRequest,
@@ -80,7 +85,7 @@ async def query_document(
 @router.get(
     "/status/{document_id}",
     dependencies=[Depends(verify_internal_token)],
-    summary="Check if a scholarship notice is indexed",
+    summary="Check if a document is indexed",
 )
 async def check_index_status(
     document_id: str,
@@ -109,4 +114,3 @@ async def delete_document_index(
         "deleted_chunks": deleted_count,
         "status": "PURGED",
     }
-

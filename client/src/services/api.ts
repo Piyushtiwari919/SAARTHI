@@ -1,14 +1,16 @@
 import type { ApiError } from '../types/common.ts';
 
-// Configurable base URL: defaults to empty or environment variable
-export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) || '';
+// Configurable base URL: defaults to empty (uses Vite dev proxy / reverse proxy) or environment variable
+export const API_BASE_URL =
+  (import.meta.env?.VITE_API_BASE_URL as string) ||
+  (import.meta.env?.VITE_API_URL as string) ||
+  '';
 
-// Explicit switch: if VITE_USE_MOCKS is explicitly specified, respect it.
-// Otherwise, default to false if API_BASE_URL is provided, or true if completely unset.
+// Explicit development-only mock mode switch.
+// Real API mode is the strict default; mock fixtures are used ONLY when explicitly enabled.
 export const USE_MOCKS =
-  import.meta.env.VITE_USE_MOCKS !== undefined
-    ? import.meta.env.VITE_USE_MOCKS === 'true'
-    : !API_BASE_URL;
+  import.meta.env?.VITE_USE_MOCKS === 'true' ||
+  import.meta.env?.VITE_ENABLE_MOCK_FALLBACK === 'true';
 
 /**
  * Artificial latency simulation for realistic UI testing of loading/async states in mock mode.

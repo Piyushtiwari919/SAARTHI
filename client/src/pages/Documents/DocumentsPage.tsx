@@ -189,7 +189,7 @@ export const DocumentsPage: React.FC = () => {
       >
         <Lock size={16} style={{ color: 'var(--brand-primary)', flexShrink: 0 }} />
         <span>
-          <strong>Private storage:</strong> Your documents are encrypted and accessible only through your authenticated account.
+          <strong>Private storage:</strong> Your documents are stored in private server storage and accessible only through your authenticated account.
         </span>
       </div>
 

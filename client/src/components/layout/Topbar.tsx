@@ -11,7 +11,8 @@ import {
 } from 'lucide-react';
 import { Avatar } from '../ui/Avatar.tsx';
 import { useAuth } from '../../hooks/useAuth.ts';
-import  { useState } from 'react';
+import { useState } from 'react';
+import { USE_MOCKS } from '../../services/api.ts';
 
 
 
@@ -73,7 +74,7 @@ export const Topbar: React.FC<TopbarProps> = ({
           <span className="topbar-verified-icon">
             <ShieldCheck size={15} />
           </span>
-          <span>Secure workspace</span>
+          <span>{USE_MOCKS ? '🟡 Demo Mocks' : '🟢 Live Engine'}</span>
         </div>
         <button
               type="button"

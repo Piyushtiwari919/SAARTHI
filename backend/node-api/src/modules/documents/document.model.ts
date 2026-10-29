@@ -32,12 +32,23 @@ export type DocumentTypeEnum =
 export interface IExtractedAttribute {
   id?: string;
   field: string;
-  value: string | number | boolean | unknown[];
+  value: string | number | boolean | unknown[] | null;
+  currency?: string;
   confidence?: number;
   sourcePage?: number;
   evidenceSnippet?: string;
   status?: string;
   verifiedByUser?: boolean;
+}
+
+export interface IExtractedEligibilityRule {
+  field: string;
+  operator: string;
+  expectedValue: unknown;
+  unit?: string;
+  sourcePage?: number;
+  evidenceSnippet?: string;
+  status?: string;
 }
 
 export interface IDocumentRecord extends Document {
@@ -50,12 +61,15 @@ export interface IDocumentRecord extends Document {
   mimeType: string;
   fileSizeBytes: number;
   status: DocumentProcessingStatus;
+  extractionStatus?: 'COMPLETED' | 'NEEDS_REVIEW' | 'FAILED';
   indexingStatus: DocumentIndexingStatus;
   progressPercent: number;
   statusMessage?: string;
   isSensitive: boolean;
   pageCount?: number;
   extractedAttributes: IExtractedAttribute[];
+  eligibilityRules?: IExtractedEligibilityRule[];
+  warnings?: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -101,6 +115,10 @@ const DocumentSchema = new Schema<IDocumentRecord>(
       default: 'UPLOADED',
       index: true,
     },
+    extractionStatus: {
+      type: String,
+      enum: ['COMPLETED', 'NEEDS_REVIEW', 'FAILED'],
+    },
     indexingStatus: {
       type: String,
       enum: ['NOT_INDEXED', 'INDEXING', 'INDEXED', 'INDEX_FAILED'],
@@ -115,6 +133,7 @@ const DocumentSchema = new Schema<IDocumentRecord>(
       {
         field: { type: String, required: true },
         value: { type: Schema.Types.Mixed },
+        currency: { type: String },
         confidence: { type: Number },
         sourcePage: { type: Number },
         evidenceSnippet: { type: String },
@@ -122,6 +141,18 @@ const DocumentSchema = new Schema<IDocumentRecord>(
         verifiedByUser: { type: Boolean, default: false },
       },
     ],
+    eligibilityRules: [
+      {
+        field: { type: String, required: true },
+        operator: { type: String, required: true },
+        expectedValue: { type: Schema.Types.Mixed },
+        unit: { type: String },
+        sourcePage: { type: Number },
+        evidenceSnippet: { type: String },
+        status: { type: String },
+      },
+    ],
+    warnings: [{ type: String }],
   },
   {
     timestamps: true,

@@ -2,16 +2,164 @@ import { ApiService, USE_MOCKS, simulateLatency } from './api.ts';
 import type {
   Document,
   DocumentStatus,
+  DocumentType,
   DocumentUploadPayload,
   ExtractedAttribute,
+  ExtractedEligibilityRule,
+  ProcessingStep,
 } from '../types/document.ts';
 import { mockDocuments } from '../mocks/data/documents.mock.ts';
+
+function formatFieldLabel(field?: string): string {
+  if (!field) return 'Attribute';
+  return field
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function generateDefaultSteps(status: DocumentStatus): ProcessingStep[] {
+  const steps: ProcessingStep[] = [
+    {
+      status: 'UPLOADED',
+      label: 'Upload completed',
+      timestamp: new Date().toISOString(),
+      message: 'Securely uploaded to private storage',
+    },
+  ];
+
+  if (status === 'QUEUED' || status === 'PROCESSING' || status === 'OCR_COMPLETE' || status === 'ANALYZING' || status === 'INDEXING' || status === 'READY') {
+    steps.push({
+      status: 'QUEUED',
+      label: 'Ingest queue dispatch',
+      message: 'Assigned to background extraction worker',
+    });
+  }
+
+  if (status === 'PROCESSING' || status === 'OCR_COMPLETE' || status === 'ANALYZING' || status === 'INDEXING' || status === 'READY') {
+    steps.push({
+      status: 'PROCESSING',
+      label: 'Preprocessing & OCR analysis',
+      message: 'Extracting text and structure from document pages',
+    });
+  }
+
+  if (status === 'READY') {
+    steps.push({
+      status: 'READY',
+      label: 'Extraction complete',
+      message: 'Document attributes extracted and stored',
+    });
+  } else if (status === 'FAILED') {
+    steps.push({
+      status: 'FAILED',
+      label: 'Processing failed',
+      message: 'Processing encountered an error; retry available',
+    });
+  }
+
+  return steps;
+}
+
+export function normalizeDocument(raw: any): Document {
+  if (!raw) return raw;
+
+  const id = String(raw.id || raw._id || raw.documentId || '');
+  const category = (raw.category || raw.documentType || 'OTHER') as DocumentType;
+  const fileName = raw.fileName || raw.originalFileName || raw.name || 'Document';
+  const customTitle = raw.customTitle || raw.title;
+  const status: DocumentStatus = raw.status || 'UPLOADED';
+
+  let progressPercent = 0;
+  if (typeof raw.progressPercent === 'number') {
+    progressPercent = raw.progressPercent;
+  } else if (status === 'READY') {
+    progressPercent = 100;
+  } else if (status === 'FAILED') {
+    progressPercent = 100;
+  } else if (status === 'PROCESSING' || status === 'ANALYZING' || status === 'OCR_COMPLETE') {
+    progressPercent = 65;
+  } else if (status === 'QUEUED') {
+    progressPercent = 25;
+  }
+
+  const rawAttrs = Array.isArray(raw.extractedAttributes) ? raw.extractedAttributes : [];
+  const extractedAttributes: ExtractedAttribute[] = rawAttrs.map((attr: any, idx: number) => ({
+    id: String(attr.id || attr._id || `attr_${id}_${idx}`),
+    field: attr.field || `field_${idx}`,
+    label: attr.label || formatFieldLabel(attr.field),
+    value: Array.isArray(attr.value)
+      ? attr.value.join(', ')
+      : typeof attr.value === 'object' && attr.value !== null
+        ? JSON.stringify(attr.value)
+        : (attr.value ?? ''),
+    currency: attr.currency || undefined,
+    confidence: typeof attr.confidence === 'number' ? attr.confidence : undefined,
+    sourceDocumentId: attr.sourceDocumentId || id,
+    sourceDocumentName: attr.sourceDocumentName || customTitle || fileName,
+    sourcePage: typeof attr.sourcePage === 'number' ? attr.sourcePage : (attr.page || undefined),
+    evidenceSnippet: attr.evidenceSnippet || attr.evidence_text || attr.snippet,
+    status: attr.status || (attr.value != null && attr.value !== '' ? 'EXTRACTED' : 'NOT_FOUND'),
+    verifiedByUser: Boolean(attr.verifiedByUser),
+  }));
+
+  const rawRules = Array.isArray(raw.eligibilityRules) ? raw.eligibilityRules : [];
+  const eligibilityRules: ExtractedEligibilityRule[] = rawRules.map((r: any, idx: number) => ({
+    ruleId: String(r.ruleId || r.rule_id || `rule_${idx + 1}`),
+    field: r.field || `field_${idx + 1}`,
+    operator: r.operator || '==',
+    value: r.value ?? r.expectedValue ?? '',
+    unit: r.unit || undefined,
+    description: r.description || '',
+    sourcePage: typeof r.sourcePage === 'number' ? r.sourcePage : (r.source_page || undefined),
+    evidenceSnippet: r.evidenceSnippet || r.evidence_snippet || undefined,
+  }));
+
+  const warnings: string[] = Array.isArray(raw.warnings)
+    ? raw.warnings.filter((w: any) => typeof w === 'string' && w.trim().length > 0)
+    : [];
+
+  const steps = Array.isArray(raw.processingSteps) && raw.processingSteps.length > 0
+    ? raw.processingSteps
+    : generateDefaultSteps(status);
+
+  return {
+    id,
+    userId: String(raw.userId || raw.ownerId || ''),
+    fileName,
+    customTitle,
+    fileSizeBytes: Number(raw.fileSizeBytes || raw.size || 0),
+    mimeType: raw.mimeType || 'application/pdf',
+    category,
+    status,
+    extractionStatus: raw.extractionStatus || undefined,
+    indexingStatus: raw.indexingStatus || undefined,
+    progressPercent,
+    statusMessage: raw.statusMessage || (status === 'READY' ? 'Ready for review' : 'Processing document...'),
+    isSensitive: raw.isSensitive !== undefined ? Boolean(raw.isSensitive) : true,
+    pageCount: Number(raw.pageCount || 1),
+    extractedAttributes,
+    eligibilityRules: eligibilityRules.length > 0 ? eligibilityRules : undefined,
+    warnings: warnings.length > 0 ? warnings : undefined,
+    processingSteps: steps,
+    createdAt: raw.createdAt ? new Date(raw.createdAt).toISOString() : new Date().toISOString(),
+    updatedAt: raw.updatedAt ? new Date(raw.updatedAt).toISOString() : new Date().toISOString(),
+    fileUrl: raw.fileUrl,
+    error: raw.error || (status === 'FAILED' ? (raw.statusMessage || 'Processing failed') : undefined),
+  };
+}
 
 type DocumentChangeListener = () => void;
 
 class DocumentService {
   private documents: Document[] = USE_MOCKS ? [...mockDocuments] : [];
   private listeners: Set<DocumentChangeListener> = new Set();
+
+  public clearCache(): void {
+    if (!USE_MOCKS) {
+      this.documents = [];
+    }
+    this.notifyListeners();
+  }
 
   public subscribe(listener: DocumentChangeListener): () => void {
     this.listeners.add(listener);
@@ -71,7 +219,30 @@ class DocumentService {
     if (filter !== 'ALL') params.set('status', filter);
     if (search) params.set('search', search);
 
-    return ApiService.request<Document[]>(`/api/documents?${params.toString()}`);
+    const rawList = await ApiService.request<any[]>(`/api/documents?${params.toString()}`);
+    const normalized = Array.isArray(rawList) ? rawList.map(normalizeDocument) : [];
+
+    // Deduplicate strictly by persisted record ID (never by filename, preserving separate genuine uploads)
+    const seenIds = new Set<string>();
+    let docs: Document[] = [];
+    for (const d of normalized) {
+      if (d && d.id && !seenIds.has(d.id)) {
+        seenIds.add(d.id);
+        docs.push(d);
+      }
+    }
+
+    if (search && search.trim()) {
+      const query = search.trim().toLowerCase();
+      docs = docs.filter(
+        (d) =>
+          d.fileName.toLowerCase().includes(query) ||
+          (d.customTitle && d.customTitle.toLowerCase().includes(query)) ||
+          d.category.toLowerCase().includes(query)
+      );
+    }
+
+    return docs;
   }
 
   // Alias for backward compatibility
@@ -85,7 +256,8 @@ class DocumentService {
       const doc = this.documents.find((d) => d.id === id);
       return doc ? { ...doc } : null;
     }
-    return ApiService.request<Document>(`/api/documents/${id}`);
+    const raw = await ApiService.request<any>(`/api/documents/${id}`);
+    return raw ? normalizeDocument(raw) : null;
   }
 
   // Alias for backward compatibility
@@ -163,13 +335,13 @@ class DocumentService {
       formData.append('isSensitive', String(payload.isSensitive));
     }
 
-    const created = await ApiService.request<Document>('/api/documents/upload', {
+    const created = await ApiService.request<any>('/api/documents/upload', {
       method: 'POST',
       body: formData,
     });
 
     this.notifyListeners();
-    return created;
+    return normalizeDocument(created);
   }
 
   public async retryDocument(id: string): Promise<Document> {
@@ -202,9 +374,11 @@ class DocumentService {
       return { ...doc };
     }
 
-    return ApiService.request<Document>(`/api/documents/${id}/retry`, {
+    const retried = await ApiService.request<any>(`/api/documents/${id}/retry`, {
       method: 'POST',
     });
+    this.notifyListeners();
+    return normalizeDocument(retried);
   }
 
   public async deleteDocument(id: string): Promise<boolean> {
@@ -219,11 +393,6 @@ class DocumentService {
     return true;
   }
 
-  /**
-   * Simulates asynchronous background processing transitions
-   * (UPLOADED -> QUEUED -> PROCESSING -> OCR_COMPLETE -> ANALYZING -> INDEXING -> READY)
-   * without blocking the UI.
-   */
   private simulatePipelineProgression(docId: string): void {
     const stages: Array<{
       status: DocumentStatus;
@@ -300,7 +469,6 @@ class DocumentService {
           message: stage.message,
         });
 
-        // When reaching READY, generate realistic evidence attributes based on category
         if (stage.status === 'READY') {
           doc.extractedAttributes = this.generateMockAttributes(doc);
         }

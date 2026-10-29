@@ -14,7 +14,7 @@ export const SignupPage: React.FC = () => {
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('password123');
+  const [password, setPassword] = useState('');
   const [institution, setInstitution] = useState('');
   const [course, setCourse] = useState('');
   const [agreeToPrivacy, setAgreeToPrivacy] = useState(true);
@@ -123,7 +123,7 @@ export const SignupPage: React.FC = () => {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="student@institution.ac.in"
-            helperText="We use your college domain to auto-verify institutional eligibility"
+            helperText="Used as your primary login identifier"
             leftIcon={<Mail size={16} />}
             required
           />
@@ -181,7 +181,7 @@ export const SignupPage: React.FC = () => {
               htmlFor="privacyConsent"
               style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', lineHeight: 1.4, cursor: 'pointer' }}
             >
-              <strong style={{ color: 'var(--text-primary)' }}>Student Data Privacy Guarantee:</strong> I consent to Saarthi extracting structured eligibility criteria from documents I choose to upload. My documents remain private to my vault and will never be shared without explicit permission.
+              <strong style={{ color: 'var(--text-primary)' }}>Student Data Privacy Consent:</strong> I consent to Saarthi extracting structured eligibility criteria from documents I choose to upload. My documents remain private to my account.
             </label>
           </div>
 

@@ -33,6 +33,7 @@ from app.rag.models import (
     SourceCitation,
 )
 from app.rag.vector_store import BaseVectorStore, ChromaVectorStore
+from app.schemas.extraction import DocumentType
 from app.services.document_loader import DocumentLoaderService
 from app.utils.file_validation import DocumentServiceException, validate_pdf_structure
 
@@ -40,9 +41,11 @@ logger = logging.getLogger(__name__)
 
 SCHOLARSHIP_COLLECTION = "scholarship_notices"
 
+ALLOWED_PERSONAL_RAG_CATEGORIES = {dt.value for dt in DocumentType} | {"SCHOLARSHIP_DOCUMENT"}
+
 
 class RAGService:
-    """End-to-end service for indexing scholarship notices and answering source-grounded questions."""
+    """End-to-end service for indexing documents and answering source-grounded questions."""
 
     def __init__(
         self,
@@ -84,19 +87,29 @@ class RAGService:
         file_bytes: bytes,
         file_format: str,
         category: str,
+        allow_personal_document: bool = False,
     ) -> RAGIndexResponse:
         """
-        Extract, chunk, embed, and persistently store a scholarship notice.
-        Enforces category restriction: only SCHOLARSHIP_NOTICE is permitted for RAG.
+        Extract, chunk, embed, and persistently store a document with strict document_id isolation.
+        By default (`allow_personal_document=False`), only SCHOLARSHIP_NOTICE is permitted.
+        When `allow_personal_document=True` (used by authenticated user-scoped document Q&A),
+        any supported user-owned document category can be indexed.
         """
-        # Strict scope enforcement: only SCHOLARSHIP_NOTICE documents are eligible
         norm_cat = category.strip().upper()
-        if norm_cat not in ("SCHOLARSHIP_NOTICE", "SCHOLARSHIP_DOCUMENT"):
-            raise DocumentServiceException(
-                error_code="UNSUPPORTED_RAG_DOCUMENT_TYPE",
-                message=f"Category '{category}' is not eligible for RAG indexing. Only SCHOLARSHIP_NOTICE documents can be indexed.",
-                status_code=400,
-            )
+        if allow_personal_document:
+            if norm_cat not in ALLOWED_PERSONAL_RAG_CATEGORIES:
+                raise DocumentServiceException(
+                    error_code="UNSUPPORTED_RAG_DOCUMENT_TYPE",
+                    message=f"Category '{category}' is not a valid document type for RAG indexing.",
+                    status_code=400,
+                )
+        else:
+            if norm_cat not in ("SCHOLARSHIP_NOTICE", "SCHOLARSHIP_DOCUMENT"):
+                raise DocumentServiceException(
+                    error_code="UNSUPPORTED_RAG_DOCUMENT_TYPE",
+                    message=f"Category '{category}' is not eligible for RAG indexing. Only SCHOLARSHIP_NOTICE documents can be indexed.",
+                    status_code=400,
+                )
 
         # Validate PDF structure if PDF
         if file_format == "pdf":
@@ -150,9 +163,9 @@ class RAGService:
         request: RAGQueryRequest,
     ) -> RAGQueryResponse:
         """
-        Execute RAG query against an authorized scholarship notice.
+        Execute RAG query against an authorized document.
         1. Checks if document is indexed (returns NOT_INDEXED if not).
-        2. Generates query embedding and retrieves top-k chunks.
+        2. Generates query embedding and retrieves top-k chunks strictly filtered by document_id.
         3. Enforces relevance threshold.
         4. Synthesizes grounded answer.
         5. Validates and attaches citations.
@@ -171,7 +184,7 @@ class RAGService:
             return RAGQueryResponse(
                 status=RAGStatus.NOT_INDEXED,
                 question=question,
-                answer="The selected scholarship notice has not been indexed for question answering yet. Please index it first.",
+                answer="The selected document has not been indexed for question answering yet. Please index it first.",
                 sources=[],
                 warnings=["Document has not been indexed in vector storage"],
                 document_id=document_id,
@@ -194,7 +207,7 @@ class RAGService:
         ]
 
         document_title = (
-            retrieved_chunks[0].chunk.document_title if retrieved_chunks else "Scholarship Notice"
+            retrieved_chunks[0].chunk.document_title if retrieved_chunks else "Selected Document"
         )
 
         if not relevant_chunks:
@@ -202,7 +215,7 @@ class RAGService:
             return RAGQueryResponse(
                 status=RAGStatus.INSUFFICIENT_EVIDENCE,
                 question=question,
-                answer="I could not find sufficient supporting evidence in the selected scholarship notice for your question.",
+                answer="I could not find sufficient supporting evidence in the selected document for your question.",
                 sources=[],
                 warnings=["No retrieved passages exceeded relevance threshold"],
                 document_id=document_id,
@@ -282,4 +295,3 @@ class RAGService:
             collection_name=SCHOLARSHIP_COLLECTION,
             document_id=document_id,
         )
-

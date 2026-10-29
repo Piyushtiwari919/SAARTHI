@@ -92,7 +92,7 @@ export const LandingPage: React.FC = () => {
             lineHeight: 1.2,
           }}
         >
-          Navigate scholarships with verified clarity, not guesswork.
+          Navigate scholarships with source-grounded clarity, not guesswork.
         </h1>
 
         <p
@@ -104,8 +104,8 @@ export const LandingPage: React.FC = () => {
             margin: '0 auto',
           }}
         >
-          Saarthi reads complex government and institutional scholarship circulars, extracts eligibility criteria,
-          and matches them against your verified documents with clear evidence and zero ambiguity.
+          Saarthi reads government and institutional scholarship circulars, extracts structured eligibility criteria,
+          and compares them against your uploaded documents with page-level evidence.
         </p>
 
         <div style={{ display: 'flex', gap: '14px', marginTop: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
@@ -116,7 +116,7 @@ export const LandingPage: React.FC = () => {
           </Link>
           <Link to="/app/dashboard">
             <Button variant="outline" size="lg">
-              View Student Demo
+              Open Dashboard
             </Button>
           </Link>
         </div>
@@ -133,7 +133,7 @@ export const LandingPage: React.FC = () => {
           }}
         >
           <Lock size={12} style={{ color: 'var(--brand-primary)' }} />
-          <span>Privacy First: Encrypted storage. Documents are used solely for your eligibility verification.</span>
+          <span>Privacy First: Private server storage. Documents are used solely for your eligibility evaluation.</span>
         </div>
       </section>
 
@@ -151,7 +151,7 @@ export const LandingPage: React.FC = () => {
             How Saarthi Works
           </h2>
           <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
-            Transparent verification built on verifiable proof rather than black-box algorithms.
+            Transparent evaluation built on extracted evidence rather than black-box guesses.
           </p>
         </div>
 
@@ -182,7 +182,7 @@ export const LandingPage: React.FC = () => {
               1. Document Vault
             </h3>
             <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-              Upload your marksheet, income proof, or certificates. Background workers extract verified student attributes with page-level confidence.
+              Upload your marksheet, income proof, or certificates. Background workers extract structured student attributes with page citations.
             </p>
           </Card>
 
@@ -206,7 +206,7 @@ export const LandingPage: React.FC = () => {
               2. Opportunity Extraction
             </h3>
             <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-              Official scholarship circulars and government schemes are parsed into structured eligibility rules (income limits, academic score thresholds).
+              Scholarship circulars and government schemes are parsed into structured eligibility rules (income limits, academic score thresholds).
             </p>
           </Card>
 
@@ -230,7 +230,7 @@ export const LandingPage: React.FC = () => {
               3. Evidence-Backed Audit
             </h3>
             <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-              View your eligibility verdict as PASS, FAIL, or NOT VERIFIED with specific document page references and exact mathematical comparisons.
+              View your eligibility result as PASS, FAIL, or UNKNOWN with specific document page references and deterministic rule comparisons.
             </p>
           </Card>
 

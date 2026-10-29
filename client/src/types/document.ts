@@ -10,6 +10,7 @@ export type DocumentStatus =
 
 export type DocumentType =
   | 'SCHOLARSHIP_DOCUMENT'
+  | 'SCHOLARSHIP_NOTICE'
   | 'MARKSHEET'
   | 'INCOME_CERTIFICATE'
   | 'BONAFIDE_CERTIFICATE'
@@ -28,12 +29,27 @@ export interface ExtractedAttribute {
   field: string;
   label: string;
   value: string | number | boolean;
+  currency?: string;
   sourceDocumentId?: string;
   sourceDocumentName?: string;
   sourcePage?: number;
-  confidence?: number; // 0 to 1
+  confidence?: number; // 0 to 1, only present if returned by backend
+  evidenceSnippet?: string;
+  status?: 'EXTRACTED' | 'NEEDS_REVIEW' | 'NOT_FOUND' | string;
   boundingBox?: [number, number, number, number];
   verifiedByUser?: boolean;
+}
+
+export interface ExtractedEligibilityRule {
+  id: string;
+  field: string;
+  label: string;
+  operator: string;
+  expectedValue: string | number | boolean;
+  unit?: string;
+  sourcePage?: number;
+  evidenceSnippet?: string;
+  status?: string;
 }
 
 export interface ProcessingStep {
@@ -52,11 +68,15 @@ export interface Document {
   category: DocumentType;
   customTitle?: string;
   status: DocumentStatus;
+  extractionStatus?: 'COMPLETED' | 'NEEDS_REVIEW' | 'FAILED';
+  indexingStatus?: 'NOT_INDEXED' | 'INDEXING' | 'INDEXED' | 'INDEX_FAILED';
   progressPercent: number;
   statusMessage?: string;
   isSensitive: boolean;
   pageCount?: number;
   extractedAttributes: ExtractedAttribute[];
+  eligibilityRules?: ExtractedEligibilityRule[];
+  warnings?: string[];
   processingSteps?: ProcessingStep[];
   ocrCompletedAt?: string;
   analysisCompletedAt?: string;
@@ -75,6 +95,7 @@ export interface DocumentUploadPayload {
 
 export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
   SCHOLARSHIP_DOCUMENT: 'Scholarship / Opportunity Document',
+  SCHOLARSHIP_NOTICE: 'Scholarship Circular / Notice',
   MARKSHEET: 'Marksheet',
   INCOME_CERTIFICATE: 'Income Certificate',
   BONAFIDE_CERTIFICATE: 'Bonafide Certificate',

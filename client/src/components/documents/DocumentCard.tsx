@@ -1,12 +1,22 @@
 import React from 'react';
-import type { Document } from '../../types/document.ts';
+import { Link } from 'react-router-dom';
+import type { Document, ExtractedAttribute } from '../../types/document.ts';
 import { DOCUMENT_TYPE_LABELS } from '../../types/document.ts';
 import { Card } from '../ui/Card.tsx';
 import { DocumentStatusBadge } from './DocumentStatusBadge.tsx';
 import { ProgressBar } from '../ui/ProgressBar.tsx';
 import { Badge } from '../ui/Badge.tsx';
 import { Button } from '../ui/Button.tsx';
-import { FileText, Lock, Trash2, ExternalLink, RotateCcw, AlertCircle, BookOpen } from 'lucide-react';
+import {
+  FileText,
+  Lock,
+  Trash2,
+  ExternalLink,
+  RotateCcw,
+  AlertCircle,
+  BookOpen,
+  MessageSquareText,
+} from 'lucide-react';
 import { formatFileSize, formatDate } from '../../utils/formatters.ts';
 
 export interface DocumentCardProps {
@@ -14,6 +24,31 @@ export interface DocumentCardProps {
   onView?: (doc: Document) => void;
   onDelete?: (doc: Document) => void;
   onRetry?: (doc: Document) => void;
+}
+
+export function getDisplayableAttributes(attributes?: ExtractedAttribute[]): ExtractedAttribute[] {
+  if (!Array.isArray(attributes)) return [];
+  return attributes.filter(
+    (attr) =>
+      attr &&
+      attr.status !== 'NOT_FOUND' &&
+      attr.field !== 'currency' &&
+      attr.value !== null &&
+      attr.value !== undefined &&
+      String(attr.value).trim() !== ''
+  );
+}
+
+export function formatAttributeDisplayValue(attr: ExtractedAttribute): string {
+  const raw = String(attr.value ?? '').trim();
+  if (!raw) return '';
+  if (attr.currency && !raw.includes(attr.currency) && !raw.includes('₹')) {
+    return `${attr.currency} ${Number(raw) ? Number(raw).toLocaleString('en-IN') : raw}`;
+  }
+  if (attr.field.includes('percentage') && !raw.endsWith('%')) {
+    return `${raw}%`;
+  }
+  return raw;
 }
 
 export const DocumentCard: React.FC<DocumentCardProps> = ({
@@ -32,6 +67,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
 
   const isFailed = document.status === 'FAILED';
   const typeLabel = DOCUMENT_TYPE_LABELS[document.category] || document.category;
+  const visibleAttributes = getDisplayableAttributes(document.extractedAttributes);
 
   return (
     <Card
@@ -167,8 +203,8 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
         </div>
       )}
 
-      {/* Extracted Evidence Attributes preview when ready */}
-      {document.extractedAttributes.length > 0 && (
+      {/* Extracted Evidence Attributes preview when ready (strictly non-empty, extracted/review fields only) */}
+      {visibleAttributes.length > 0 && (
         <div
           style={{
             display: 'flex',
@@ -178,7 +214,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
             borderTop: '1px solid var(--border-subtle)',
           }}
         >
-          {document.extractedAttributes.slice(0, 3).map((attr) => (
+          {visibleAttributes.slice(0, 3).map((attr) => (
             <div
               key={attr.id}
               style={{
@@ -195,7 +231,9 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
               }}
             >
               <span style={{ color: 'var(--text-muted)' }}>{attr.label || attr.field}:</span>
-              <strong style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{String(attr.value)}</strong>
+              <strong style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
+                {formatAttributeDisplayValue(attr)}
+              </strong>
               {attr.sourcePage && (
                 <span style={{ color: 'var(--brand-primary)', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '2px', whiteSpace: 'nowrap' }}>
                   <BookOpen size={9} /> p.{attr.sourcePage}
@@ -203,9 +241,9 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
               )}
             </div>
           ))}
-          {document.extractedAttributes.length > 3 && (
+          {visibleAttributes.length > 3 && (
             <span style={{ fontSize: '11px', color: 'var(--text-muted)', alignSelf: 'center' }}>
-              +{document.extractedAttributes.length - 3} more
+              +{visibleAttributes.length - 3} more
             </span>
           )}
         </div>
@@ -246,6 +284,28 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
               <RotateCcw size={12} />
               <span>Retry</span>
             </button>
+          )}
+
+          {document.status === 'READY' && (
+            <Link
+              to={`/app/assistant?documentId=${document.id}`}
+              style={{
+                color: 'var(--brand-primary)',
+                fontSize: 'var(--text-xs)',
+                fontWeight: 600,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '4px 8px',
+                borderRadius: 'var(--radius-xs)',
+                textDecoration: 'none',
+                backgroundColor: 'var(--brand-light)',
+              }}
+              title="Ask questions grounded in this document"
+            >
+              <MessageSquareText size={12} />
+              <span>Ask AI</span>
+            </Link>
           )}
 
           {onDelete && (

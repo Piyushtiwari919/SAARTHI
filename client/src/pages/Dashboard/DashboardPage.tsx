@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   GraduationCap,
@@ -10,6 +10,7 @@ import {
   MessageSquareText,
   Clock,
   Sparkles,
+  CheckCircle2,
 } from 'lucide-react';
 import { PageHeader } from '../../components/layout/PageHeader.tsx';
 import { Button } from '../../components/ui/Button.tsx';
@@ -17,14 +18,19 @@ import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Ca
 import { Badge } from '../../components/ui/Badge.tsx';
 import { LoadingState } from '../../components/ui/LoadingState.tsx';
 import { ErrorState } from '../../components/ui/ErrorState.tsx';
-import { DocumentCard } from '../../components/documents/DocumentCard.tsx';
+import {
+  DocumentCard,
+  formatAttributeDisplayValue,
+  getDisplayableAttributes,
+} from '../../components/documents/DocumentCard.tsx';
 import { EligibilityStatusBadge } from '../../components/eligibility/EligibilityStatusBadge.tsx';
 import { useAuth } from '../../hooks/useAuth.ts';
 import { useToast } from '../../hooks/useToast.ts';
 import { documentService } from '../../services/document.service.ts';
 import { opportunityService } from '../../services/opportunity.service.ts';
 import { eligibilityService } from '../../services/eligibility.service.ts';
-import type { Document } from '../../types/document.ts';
+import { USE_MOCKS } from '../../services/api.ts';
+import type { Document, ExtractedAttribute } from '../../types/document.ts';
 import type { Opportunity } from '../../types/opportunity.ts';
 import type { OpportunityEligibility, ActionItem } from '../../types/eligibility.ts';
 import { formatCurrency, formatDate } from '../../utils/formatters.ts';
@@ -41,16 +47,21 @@ export const DashboardPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadDashboardData = async () => {
+  const loadDashboardData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const [docsData, oppsData, eligData, actionsData] = await Promise.all([
+      const [docsRes, oppsRes, eligRes, actionsRes] = await Promise.allSettled([
         documentService.getDocuments(),
         opportunityService.getOpportunities(),
         eligibilityService.getAllEligibilitySummaries(),
         eligibilityService.getActionItems(),
       ]);
+
+      const docsData = docsRes.status === 'fulfilled' ? docsRes.value : [];
+      const oppsData = oppsRes.status === 'fulfilled' ? oppsRes.value : [];
+      const eligData = eligRes.status === 'fulfilled' ? eligRes.value : [];
+      const actionsData = actionsRes.status === 'fulfilled' ? actionsRes.value : [];
 
       setDocuments(docsData);
       setOpportunities(oppsData);
@@ -61,48 +72,21 @@ export const DashboardPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    let ignore = false;
-    const fetchAll = async () => {
-      try {
-        const [docsData, oppsData, eligData, actionsData] = await Promise.all([
-          documentService.getDocuments(),
-          opportunityService.getOpportunities(),
-          eligibilityService.getAllEligibilitySummaries(),
-          eligibilityService.getActionItems(),
-        ]);
-        if (!ignore) {
-          setDocuments(docsData);
-          setOpportunities(oppsData);
-          setEligibilitySummaries(eligData);
-          setActionItems(actionsData);
-        }
-      } catch {
-        if (!ignore) {
-          setError('Unable to load dashboard intelligence. Please try refreshing.');
-        }
-      } finally {
-        if (!ignore) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    fetchAll();
+    loadDashboardData();
 
     const unsubscribe = documentService.subscribe(() => {
       documentService.getDocuments().then((docs) => {
-        if (!ignore) setDocuments(docs);
+        setDocuments(docs);
       });
     });
 
     return () => {
-      ignore = true;
       unsubscribe();
     };
-  }, []);
+  }, [loadDashboardData]);
 
   const handleRetryDocument = async (doc: Document) => {
     try {
@@ -124,7 +108,7 @@ export const DashboardPage: React.FC = () => {
   };
 
   if (isLoading) {
-    return <LoadingState message="Aggregating verified attributes & opportunity rules..." fullHeight />;
+    return <LoadingState message="Loading your documents and scholarship catalogue..." fullHeight />;
   }
 
   if (error) {
@@ -132,29 +116,44 @@ export const DashboardPage: React.FC = () => {
   }
 
   // Map opportunity ID to eligibility result
-  const eligibilityMap = new Map( eligibilitySummaries.map((item) => [item.opportunityId, item]));
+  const eligibilityMap = new Map(eligibilitySummaries.map((item) => [item.opportunityId, item]));
 
   // Documents processing count
   const processingCount = documents.filter(
     (doc) => doc.status !== 'READY' && doc.status !== 'FAILED'
   ).length;
 
-  const eligibleCount = (eligibilitySummaries ?? []).filter(
-  (item) => item.overallStatus === 'ELIGIBLE'
-).length;
+  const eligibleCount = eligibilitySummaries.filter(
+    (item) => item.overallStatus === 'PASS'
+  ).length;
 
-const inReviewCount = (eligibilitySummaries ?? []).filter(
-  (item) => item.overallStatus === 'IN_REVIEW'
-).length;
+  const inReviewCount = eligibilitySummaries.filter(
+    (item) => item.overallStatus === 'UNKNOWN' || item.overallStatus === 'NOT_VERIFIED'
+  ).length;
+
+  // Aggregate only genuinely extracted, non-empty attributes across user documents
+  const allExtractedAttributes: Array<ExtractedAttribute & { docName: string }> = [];
+  for (const doc of documents) {
+    const docName = doc.customTitle || doc.fileName;
+    const validAttrs = getDisplayableAttributes(doc.extractedAttributes);
+    for (const attr of validAttrs) {
+      allExtractedAttributes.push({ ...attr, docName });
+    }
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
       {/* Page Header */}
       <PageHeader
         title={`Welcome back, ${user?.fullName?.split(' ')[0] || 'Student'}`}
-        description={`${user?.academicDetails?.course || 'Undergraduate'} • ${user?.academicDetails?.institution || 'Academic Institution'}`}
+        description={`${user?.academicDetails?.course || 'Student Applicant'}${user?.academicDetails?.institution ? ` • ${user.academicDetails.institution}` : ''}`}
         actions={
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            {USE_MOCKS && (
+              <Badge variant="neutral" size="sm">
+                Demo Mode
+              </Badge>
+            )}
             <Link to="/app/assistant">
               <Button variant="secondary" size="md" leftIcon={<MessageSquareText size={16} />}>
                 Ask Document AI
@@ -180,7 +179,7 @@ const inReviewCount = (eligibilitySummaries ?? []).filter(
         <Card style={{ padding: '18px 20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
             <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', fontWeight: 500 }}>
-              Matched Opportunities
+              Scholarship Catalogue
             </span>
             <div style={{ color: 'var(--brand-primary)' }}>
               <GraduationCap size={18} />
@@ -189,9 +188,15 @@ const inReviewCount = (eligibilitySummaries ?? []).filter(
           <div style={{ fontSize: 'var(--text-3xl)', fontWeight: 700, color: 'var(--text-primary)' }}>
             {opportunities.length}
           </div>
-          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--success)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <span>{eligibleCount} Verified Eligible</span>
-            <span style={{ color: 'var(--text-muted)' }}>• {inReviewCount} In Review</span>
+          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            {eligibilitySummaries.length === 0 ? (
+              <span>Not evaluated yet</span>
+            ) : (
+              <>
+                <span style={{ color: 'var(--success)' }}>{eligibleCount} Eligible</span>
+                <span>• {inReviewCount} Needs Evidence</span>
+              </>
+            )}
           </div>
         </Card>
 
@@ -213,7 +218,7 @@ const inReviewCount = (eligibilitySummaries ?? []).filter(
                 {processingCount} processing in background
               </span>
             ) : (
-              'All documents verified'
+              `${documents.filter((d) => d.status === 'READY').length} documents ready`
             )}
           </div>
         </Card>
@@ -221,34 +226,38 @@ const inReviewCount = (eligibilitySummaries ?? []).filter(
         <Card style={{ padding: '18px 20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
             <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', fontWeight: 500 }}>
-              Evidence Attributes
+              Extracted Attributes
             </span>
             <div style={{ color: 'var(--brand-primary)' }}>
               <ShieldCheck size={18} />
             </div>
           </div>
           <div style={{ fontSize: 'var(--text-3xl)', fontWeight: 700, color: 'var(--text-primary)' }}>
-            6
+            {allExtractedAttributes.length}
           </div>
           <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: '4px' }}>
-            Derived from official scanned proofs
+            Extracted from your uploaded documents
           </div>
         </Card>
 
         <Card style={{ padding: '18px 20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
             <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', fontWeight: 500 }}>
-              Required Actions
+              Action Items
             </span>
-            <div style={{ color: 'var(--warning)' }}>
-              <AlertCircle size={18} />
+            <div style={{ color: actionItems.length > 0 ? 'var(--warning)' : 'var(--text-muted)' }}>
+              {actionItems.length > 0 ? <AlertCircle size={18} /> : <CheckCircle2 size={18} />}
             </div>
           </div>
           <div style={{ fontSize: 'var(--text-3xl)', fontWeight: 700, color: 'var(--text-primary)' }}>
             {actionItems.length}
           </div>
           <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: '4px' }}>
-            Required for portal submissions
+            {actionItems.length > 0
+              ? 'From evaluated scholarship requirements'
+              : eligibilitySummaries.length > 0
+                ? 'All evaluated criteria satisfied'
+                : 'Run an eligibility audit to generate actions'}
           </div>
         </Card>
       </div>
@@ -262,7 +271,7 @@ const inReviewCount = (eligibilitySummaries ?? []).filter(
           alignItems: 'start',
         }}
       >
-        {/* Left Column: Top Matched Opportunities */}
+        {/* Left Column: Top Opportunities */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <Card>
             <CardHeader
@@ -274,9 +283,9 @@ const inReviewCount = (eligibilitySummaries ?? []).filter(
               }}
             >
               <div>
-                <CardTitle>Top Matched Opportunities</CardTitle>
+                <CardTitle>Public Scholarship Catalogue</CardTitle>
                 <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
-                  Evaluated against your evidence profile
+                  Evaluate your extracted document evidence against scholarship rules
                 </span>
               </div>
               <Link to="/app/opportunities">
@@ -287,100 +296,104 @@ const inReviewCount = (eligibilitySummaries ?? []).filter(
             </CardHeader>
 
             <CardContent style={{ display: 'flex', flexDirection: 'column', gap: '14px', padding: '0 24px 20px 24px' }}>
-              {opportunities.slice(0, 3).map((opp) => {
-                const eligibility = eligibilityMap.get(opp.id);
-                return (
-                  <div
-                    key={opp.id}
-                    style={{
-                      padding: '16px',
-                      borderRadius: 'var(--radius-sm)',
-                      border: '1px solid var(--border-subtle)',
-                      backgroundColor: 'var(--surface-subtle)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '10px',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
-                      <div>
-                        <span style={{ fontSize: '11px', color: 'var(--brand-primary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                          {opp.provider}
-                        </span>
-                        <h4 style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-primary)', marginTop: '2px' }}>
-                          {opp.title}
-                        </h4>
-                      </div>
-                      {eligibility && (
-                        <EligibilityStatusBadge status={eligibility.overallStatus} size="sm" />
-                      )}
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Badge variant="neutral" size="sm">
-                          {formatCurrency(opp.amount)}
-                        </Badge>
-                        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <Clock size={12} /> Deadline: {formatDate(opp.deadline)}
-                        </span>
+              {opportunities.length === 0 ? (
+                <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--text-xs)' }}>
+                  No active opportunities found in directory.
+                </div>
+              ) : (
+                opportunities.slice(0, 3).map((opp) => {
+                  const eligibility = eligibilityMap.get(opp.id);
+                  return (
+                    <div
+                      key={opp.id}
+                      style={{
+                        padding: '16px',
+                        borderRadius: 'var(--radius-sm)',
+                        border: '1px solid var(--border-subtle)',
+                        backgroundColor: 'var(--surface-subtle)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '10px',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
+                        <div>
+                          <span style={{ fontSize: '11px', color: 'var(--brand-primary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            {opp.provider}
+                          </span>
+                          <h4 style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-primary)', marginTop: '2px' }}>
+                            {opp.title}
+                          </h4>
+                        </div>
+                        {eligibility ? (
+                          <EligibilityStatusBadge status={eligibility.overallStatus} size="sm" />
+                        ) : (
+                          <Badge variant="neutral" size="sm">Not Evaluated</Badge>
+                        )}
                       </div>
 
-                      <Link to="/app/eligibility">
-                        <Button variant="outline" size="sm">
-                          Audit Rules
-                        </Button>
-                      </Link>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <Badge variant="neutral" size="sm">
+                            {formatCurrency(opp.amount)}
+                          </Badge>
+                          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Clock size={12} /> Deadline: {formatDate(opp.deadline)}
+                          </span>
+                        </div>
+
+                        <Link to="/app/eligibility">
+                          <Button variant="outline" size="sm">
+                            Audit Rules
+                          </Button>
+                        </Link>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </CardContent>
           </Card>
 
-          {/* Evidence-Backed User Attributes Preview */}
+          {/* Extracted Attributes Preview */}
           <Card>
             <CardHeader>
               <CardTitle style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Sparkles size={18} style={{ color: 'var(--brand-primary)' }} />
-                <span>Verified Student Evidence Profile</span>
+                <span>Extracted Document Attributes</span>
               </CardTitle>
               <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
-                Extracted from your uploaded government & university documents
+                Fields extracted from your uploaded documents with page provenance
               </span>
             </CardHeader>
             <CardContent>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-                  gap: '12px',
-                }}
-              >
-                <div style={{ padding: '12px', backgroundColor: 'var(--surface-muted)', borderRadius: 'var(--radius-sm)' }}>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Annual Family Income</div>
-                  <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-primary)', marginTop: '2px' }}>₹2,40,000 / year</div>
-                  <div style={{ fontSize: '10px', color: 'var(--brand-primary)', marginTop: '4px' }}>✓ Tehsildar Income Proof (p.1)</div>
+              {allExtractedAttributes.length === 0 ? (
+                <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--text-xs)', backgroundColor: 'var(--surface-muted)', borderRadius: 'var(--radius-sm)' }}>
+                  No attributes extracted yet. Upload your marksheets, registration forms, or certificates in the Document Vault.
                 </div>
-
-                <div style={{ padding: '12px', backgroundColor: 'var(--surface-muted)', borderRadius: 'var(--radius-sm)' }}>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Academic Standing</div>
-                  <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-primary)', marginTop: '2px' }}>82.5% (8.42 CGPA)</div>
-                  <div style={{ fontSize: '10px', color: 'var(--brand-primary)', marginTop: '4px' }}>✓ Semester 4 Grade Card (p.2)</div>
+              ) : (
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                    gap: '12px',
+                  }}
+                >
+                  {allExtractedAttributes.slice(0, 6).map((attr) => (
+                    <div key={attr.id} style={{ padding: '12px', backgroundColor: 'var(--surface-muted)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                        {attr.label || attr.field}
+                      </div>
+                      <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-primary)', marginTop: '2px' }}>
+                        {formatAttributeDisplayValue(attr)}
+                      </div>
+                      <div style={{ fontSize: '10px', color: 'var(--brand-primary)', marginTop: '4px' }}>
+                        Source: {attr.docName} {attr.sourcePage ? `(p.${attr.sourcePage})` : ''}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-
-                <div style={{ padding: '12px', backgroundColor: 'var(--surface-muted)', borderRadius: 'var(--radius-sm)' }}>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Social Category</div>
-                  <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-primary)', marginTop: '2px' }}>OBC (Non-Creamy Layer)</div>
-                  <div style={{ fontSize: '10px', color: 'var(--warning)', marginTop: '4px' }}>⏳ Worker AI Analyzing...</div>
-                </div>
-
-                <div style={{ padding: '12px', backgroundColor: 'var(--surface-muted)', borderRadius: 'var(--radius-sm)' }}>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>State Domicile</div>
-                  <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-primary)', marginTop: '2px' }}>Maharashtra</div>
-                  <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' }}>⏳ OCR Complete</div>
-                </div>
-              </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -399,7 +412,7 @@ const inReviewCount = (eligibilitySummaries ?? []).filter(
               <div>
                 <CardTitle>Vault Documents Pipeline</CardTitle>
                 <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
-                  Real-time status of document workers
+                  Real-time status of your uploaded documents
                 </span>
               </div>
               <Link to="/app/documents">
@@ -410,15 +423,21 @@ const inReviewCount = (eligibilitySummaries ?? []).filter(
             </CardHeader>
 
             <CardContent style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '0 24px 20px 24px' }}>
-              {documents.slice(0, 3).map((doc) => (
-                <DocumentCard
-                  key={doc.id}
-                  document={doc}
-                  onView={(d) => navigate(`/app/documents/${d.id}`)}
-                  onDelete={handleDeleteDocument}
-                  onRetry={handleRetryDocument}
-                />
-              ))}
+              {documents.length === 0 ? (
+                <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--text-xs)' }}>
+                  No documents in vault. Click "Upload Document" to get started.
+                </div>
+              ) : (
+                documents.slice(0, 3).map((doc) => (
+                  <DocumentCard
+                    key={doc.id}
+                    document={doc}
+                    onView={(d) => navigate(`/app/documents/${d.id}`)}
+                    onDelete={handleDeleteDocument}
+                    onRetry={handleRetryDocument}
+                  />
+                ))
+              )}
             </CardContent>
           </Card>
 
@@ -427,36 +446,44 @@ const inReviewCount = (eligibilitySummaries ?? []).filter(
             <CardHeader>
               <CardTitle>Personalized Action Plan</CardTitle>
               <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
-                Items required to finalize your applications
+                Items generated when you evaluate scholarship opportunities
               </span>
             </CardHeader>
             <CardContent style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {actionItems.slice(0, 2).map((item) => (
-                <div
-                  key={item.id}
-                  style={{
-                    padding: '12px 14px',
-                    borderRadius: 'var(--radius-sm)',
-                    border: '1px solid var(--border)',
-                    backgroundColor: 'var(--surface-muted)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '4px',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text-primary)' }}>
-                      {item.title}
-                    </span>
-                    <Badge variant={item.priority === 'HIGH' ? 'danger' : 'neutral'} size="sm">
-                      {item.priority}
-                    </Badge>
-                  </div>
-                  <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>
-                    {item.description}
-                  </p>
+              {actionItems.length === 0 ? (
+                <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--text-xs)', backgroundColor: 'var(--surface-muted)', borderRadius: 'var(--radius-sm)' }}>
+                  {eligibilitySummaries.length === 0
+                    ? 'No eligibility evaluations run yet. Open Eligibility Check to evaluate opportunities against your documents.'
+                    : 'All evaluated criteria verified. Ready to apply!'}
                 </div>
-              ))}
+              ) : (
+                actionItems.slice(0, 3).map((item) => (
+                  <div
+                    key={item.id}
+                    style={{
+                      padding: '12px 14px',
+                      borderRadius: 'var(--radius-sm)',
+                      border: '1px solid var(--border)',
+                      backgroundColor: 'var(--surface-muted)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text-primary)' }}>
+                        {item.title}
+                      </span>
+                      <Badge variant={item.priority === 'HIGH' ? 'danger' : 'neutral'} size="sm">
+                        {item.priority}
+                      </Badge>
+                    </div>
+                    <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>
+                      {item.description}
+                    </p>
+                  </div>
+                ))
+              )}
             </CardContent>
           </Card>
         </div>

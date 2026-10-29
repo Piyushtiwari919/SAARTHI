@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import type { UserProfile, LoginCredentials, SignupData } from '../types/auth.ts';
 import { authService } from '../services/auth.service.ts';
+import { documentService } from '../services/document.service.ts';
 import { AuthContext } from './AuthContext.ts';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -32,6 +33,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = useCallback(async (credentials: LoginCredentials) => {
     setIsLoading(true);
     try {
+      documentService.clearCache();
       const session = await authService.login(credentials);
       setUser(session.user);
     } finally {
@@ -42,6 +44,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signup = useCallback(async (data: SignupData) => {
     setIsLoading(true);
     try {
+      documentService.clearCache();
       const session = await authService.signup(data);
       setUser(session.user);
     } finally {
@@ -53,6 +56,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(true);
     try {
       await authService.logout();
+      documentService.clearCache();
       setUser(null);
     } finally {
       setIsLoading(false);

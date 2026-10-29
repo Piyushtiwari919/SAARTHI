@@ -30,6 +30,18 @@ class LocalExtractionProvider(BaseExtractionProvider):
             return self._extract_income_certificate(pages)
         elif document_type == DocumentType.SCHOLARSHIP_NOTICE:
             return self._extract_scholarship_notice(pages)
+        elif document_type in (
+            DocumentType.MARKSHEET,
+            DocumentType.BONAFIDE_CERTIFICATE,
+            DocumentType.DOMICILE_CERTIFICATE,
+            DocumentType.CASTE_CERTIFICATE,
+            DocumentType.IDENTITY_PROOF,
+            DocumentType.BANK_DOCUMENT,
+            DocumentType.ADMISSION_LETTER,
+            DocumentType.FEE_RECEIPT,
+            DocumentType.OTHER,
+        ):
+            return self._extract_academic_or_general_document(document_type, pages)
         else:
             raise ValueError(f"Unsupported document type: {document_type}")
 
@@ -48,7 +60,7 @@ class LocalExtractionProvider(BaseExtractionProvider):
         income_field = self._extract_income_amount(pages)
         if income_field:
             fields.append(income_field)
-            # Add currency field companion
+            # Add currency field companion only when income was actually extracted
             fields.append(
                 ExtractedField(
                     field="currency",
@@ -70,13 +82,6 @@ class LocalExtractionProvider(BaseExtractionProvider):
                     source_page=None,
                     evidence_snippet=None,
                     confidence=0.0,
-                )
-            )
-            fields.append(
-                ExtractedField(
-                    field="currency",
-                    value=None,
-                    status=FieldExtractionStatus.NOT_FOUND,
                 )
             )
             warnings.append("Annual family income could not be identified in the document.")
@@ -136,17 +141,16 @@ class LocalExtractionProvider(BaseExtractionProvider):
         return None
 
     def _extract_issue_date(self, pages: List[PageContent]) -> Tuple[ExtractedField, Optional[str]]:
-        date_patterns = [
-            # Date of Issue: DD/MM/YYYY or YYYY-MM-DD
-            r"(?i)(?:date\s+of\s+issue|issued\s+on|date\s*:|dated)\s*[:\s]*(\d{1,4}[-/.][A-Za-z0-9]+[-/.]\d{2,4})",
-            # Named month: 15 August 2023 or August 15, 2023
-            r"(?i)\b(\d{1,2}(?:st|nd|rd|th)?\s+(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember))[,\s]+\d{4})\b",
-            # General standalone date
-            r"\b(\d{1,2}[-/.]\d{1,2}[-/.]\d{4})\b",
+        # Priority 1: Explicitly labeled issue date (never match Payment/Submission Date or Date of Birth)
+        explicit_patterns = [
+            r"(?i)(?:date\s+of\s+issue|issue\s+date|issued\s+on|dated)\s*[:\s-]*(\d{1,4}[-/.][A-Za-z0-9]+[-/.]\d{2,4})",
+            r"(?i)(?:date\s+of\s+issue|issue\s+date|issued\s+on|dated)\s*[:\s-]*(\d{1,2}(?:st|nd|rd|th)?\s+(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember))[,\s]+\d{4})",
+            # Line-start "Date:" not preceded by Submission / Payment / Birth / Application
+            r"(?im)^\s*date\s*:\s*(\d{1,4}[-/.][A-Za-z0-9]+[-/.]\d{2,4})",
         ]
 
         for page in pages:
-            for pattern in date_patterns:
+            for pattern in explicit_patterns:
                 match = re.search(pattern, page.text)
                 if match:
                     raw_date = match.group(1).strip()
@@ -279,6 +283,336 @@ class LocalExtractionProvider(BaseExtractionProvider):
             evidence_snippet=None,
             confidence=0.0,
         )
+
+    # -------------------------------------------------------------------------
+    # ACADEMIC / EXAM / GENERAL DOCUMENTS (MARKSHEET, OTHER, CERTIFICATES, ETC.)
+    # -------------------------------------------------------------------------
+
+    def _extract_academic_or_general_document(
+        self,
+        document_type: DocumentType,
+        pages: List[PageContent],
+    ) -> ProviderExtractionResult:
+        """
+        Extract genuinely present academic, registration, or identity fields
+        without fabricating unrelated fields (such as annual_family_income or currency).
+        """
+        warnings: List[str] = []
+        fields: List[ExtractedField] = []
+
+        # 1. Applicant / Student Name
+        applicant_field = self._extract_applicant_name(pages)
+        if applicant_field:
+            fields.append(applicant_field)
+
+        # 2. Form / Application / Roll / Registration Number
+        form_num_field = self._extract_form_or_roll_number(pages)
+        if form_num_field:
+            fields.append(form_num_field)
+
+        # 3. Institution / University / Board
+        institution_field = self._extract_institution_name(pages)
+        if institution_field:
+            fields.append(institution_field)
+
+        # 4. Course / Programme
+        course_field = self._extract_course_name(pages)
+        if course_field:
+            fields.append(course_field)
+
+        # 5. Percentages / Marks (Class XII, Class X, or general Percentage/CGPA)
+        pct_fields = self._extract_academic_percentages(pages)
+        fields.extend(pct_fields)
+
+        # 6. Payment / Submission Date (distinct from Issue Date!)
+        sub_date_field, sub_warn = self._extract_submission_date(pages)
+        if sub_date_field:
+            fields.append(sub_date_field)
+            if sub_warn:
+                warnings.append(sub_warn)
+
+        # 7. Explicit Issue Date (only if explicitly labeled as Date of Issue / Issued On)
+        issue_date_field, issue_warn = self._extract_issue_date(pages)
+        if issue_date_field.status != FieldExtractionStatus.NOT_FOUND:
+            fields.append(issue_date_field)
+            if issue_warn:
+                warnings.append(issue_warn)
+
+        # 8. Category & State (if present on registration/caste/domicile forms)
+        category_field = self._extract_caste_category(pages)
+        if category_field:
+            fields.append(category_field)
+
+        state_field = self._extract_state_name(pages)
+        if state_field:
+            fields.append(state_field)
+
+        # 9. Certificate Number (if present on certificates)
+        cert_field = self._extract_certificate_number(pages)
+        if cert_field.status != FieldExtractionStatus.NOT_FOUND and not form_num_field:
+            fields.append(cert_field)
+
+        # Check for category mismatch warning (e.g. Pre-Registration / Application Form uploaded as MARKSHEET)
+        full_text = "\n".join(p.text for p in pages)
+        if document_type == DocumentType.MARKSHEET and re.search(
+            r"(?i)\b(?:pre-registration|application\s+form|form\s+number|payment/submission\s+status)\b",
+            full_text,
+        ):
+            warnings.append(
+                "Uploaded with category MARKSHEET, but document content appears to be an application or registration form."
+            )
+
+        if not fields:
+            warnings.append("No structured fields could be automatically extracted from this document.")
+
+        return ProviderExtractionResult(
+            extracted_fields=fields,
+            eligibility_rules=None,
+            warnings=warnings,
+            provider_used="local",
+        )
+
+    def _extract_applicant_name(self, pages: List[PageContent]) -> Optional[ExtractedField]:
+        patterns = [
+            r"(?i)(?:full\s+name\s+of\s+the\s+applicant|applicant(?:'s)?\s+name|name\s+of\s+(?:the\s+)?(?:student|candidate|applicant)|student\s+name|candidate\s+name)\s*[:\-]\s*([A-Z][A-Za-z\s.]{2,60})",
+        ]
+        for page in pages:
+            for pattern in patterns:
+                match = re.search(pattern, page.text)
+                if match:
+                    raw_name = match.group(1).splitlines()[0].strip()
+                    # Stop if next label is on the same line
+                    raw_name = re.split(r"\s{2,}|(?:Father|Mother|Gender|Date of Birth|Roll|Form)\b", raw_name)[0].strip()
+                    if len(raw_name) >= 2:
+                        snippet = self._make_snippet(page.text, match.start(), match.end())
+                        return ExtractedField(
+                            field="applicant_name",
+                            value=raw_name,
+                            currency=None,
+                            status=FieldExtractionStatus.EXTRACTED,
+                            source_page=page.page_number,
+                            evidence_snippet=snippet,
+                            confidence=0.94,
+                        )
+        return None
+
+    def _extract_form_or_roll_number(self, pages: List[PageContent]) -> Optional[ExtractedField]:
+        patterns = [
+            (
+                "form_number",
+                r"(?i)(?:form\s+number|form\s+no\.?|application\s+number|application\s+no\.?|registration\s+no\.?)\s*[:#\-]?\s*([A-Z0-9\/-]{5,30})",
+            ),
+            (
+                "roll_number",
+                r"(?i)(?:roll\s+number|roll\s+no\.?|enrollment\s+no\.?)\s*[:#\-]?\s*([A-Z0-9\/-]{5,30})",
+            ),
+        ]
+        for page in pages:
+            for field_name, pattern in patterns:
+                match = re.search(pattern, page.text)
+                if match:
+                    val = match.group(1).strip()
+                    snippet = self._make_snippet(page.text, match.start(), match.end())
+                    return ExtractedField(
+                        field=field_name,
+                        value=val,
+                        currency=None,
+                        status=FieldExtractionStatus.EXTRACTED,
+                        source_page=page.page_number,
+                        evidence_snippet=snippet,
+                        confidence=0.95,
+                    )
+        return None
+
+    def _extract_institution_name(self, pages: List[PageContent]) -> Optional[ExtractedField]:
+        for page in pages:
+            lines = [l.strip() for l in page.text.splitlines() if l.strip()]
+            for idx, clean_line in enumerate(lines[:12]):
+                if re.search(
+                    r"(?i)\b(?:University|Institute\s+of\s+Technology|National\s+Institute|Board\s+of\s+[A-Za-z\s]+|College\s+of\s+[A-Za-z\s]+)\b",
+                    clean_line,
+                ):
+                    val = clean_line
+                    # Join wrapped continuation line (e.g. "Uttar\nPradesh, Lucknow")
+                    if idx + 1 < len(lines) and re.match(r"^(?:Pradesh|Delhi|Mumbai|India|[A-Za-z]+,\s*[A-Za-z]+)\b", lines[idx + 1]):
+                        val = f"{val} {lines[idx + 1]}"
+                    return ExtractedField(
+                        field="institution",
+                        value=val[:120],
+                        currency=None,
+                        status=FieldExtractionStatus.EXTRACTED,
+                        source_page=page.page_number,
+                        evidence_snippet=val[:120],
+                        confidence=0.92,
+                    )
+        return None
+
+    def _extract_course_name(self, pages: List[PageContent]) -> Optional[ExtractedField]:
+        patterns = [
+            r"(?i)\b((?:Bachelor|Master)\s+of\s+[A-Za-z\s()&,-]{3,40}\([A-Za-z\s&,-]{3,60}\))",
+            r"(?i)\b(Bachelor\s+of\s+[A-Za-z\s()&,-]{3,70}|Master\s+of\s+[A-Za-z\s()&,-]{3,70}|B\.?\s*Tech[A-Za-z\s()&,-]{0,50}|M\.?\s*Tech[A-Za-z\s()&,-]{0,50}|B\.?\s*Sc[A-Za-z\s()&,-]{0,50})",
+            r"(?i)(?:course\s+applied\s+for|programme|course\s+name|branch)\s*[:\-]\s*([A-Za-z\s()&,-]{4,80})",
+        ]
+        for page in pages:
+            for pattern in patterns:
+                match = re.search(pattern, page.text)
+                if match:
+                    raw = match.group(1)
+                    if "(" in raw and ")" in raw:
+                        val = re.sub(r"\s+", " ", raw).strip()
+                    else:
+                        val = raw.splitlines()[0].strip()
+                    if len(val) >= 4:
+                        snippet = self._make_snippet(page.text, match.start(), match.end())
+                        return ExtractedField(
+                            field="course",
+                            value=val,
+                            currency=None,
+                            status=FieldExtractionStatus.EXTRACTED,
+                            source_page=page.page_number,
+                            evidence_snippet=snippet,
+                            confidence=0.92,
+                        )
+        return None
+
+    def _extract_academic_percentages(self, pages: List[PageContent]) -> List[ExtractedField]:
+        results: List[ExtractedField] = []
+
+        for page in pages:
+            # 1. Check Class XII Percentage across PyMuPDF / pdf-parse / inline form layouts
+            xii_patterns = [
+                r"(?is)Class\s+XII\s+Percentage\s*\([^)]*\)\s*(?:\([^)]*\)\s*)?(\d{2}(?:\.\d{1,2})?)",
+                r"(?is)Class\s+XII\s+Year\s+of\s+Passing[^\n]*\n(?:Examination:\s*\n)?Class\s+XII\s+Percentage:\s*\nClass\s+XII\s+Roll/Registration\s+Number:\s*\n\s*(?:19|20)\d{2}\s*\n\s*(\d{2}(?:\.\d{1,2})?)",
+                r"(?i)Class\s+(?:XII|12(?:th)?)\s+Percentage\s*[:\-]?\s*(\d{2}(?:\.\d{1,2})?)\s*%?",
+            ]
+            for pat in xii_patterns:
+                m = re.search(pat, page.text)
+                if m:
+                    val = float(m.group(1))
+                    snippet = self._make_snippet(page.text, m.start(), m.end())
+                    results.append(
+                        ExtractedField(
+                            field="class_xii_percentage",
+                            value=val,
+                            currency=None,
+                            status=FieldExtractionStatus.EXTRACTED,
+                            source_page=page.page_number,
+                            evidence_snippet=snippet,
+                            confidence=0.93,
+                        )
+                    )
+                    break
+
+            # 2. Check Class X Percentage across PyMuPDF / pdf-parse / inline form layouts
+            x_patterns = [
+                r"(?is)Class\s+X\s+Percentage\s*\([^)]*\)\s*(?:\([^)]*\)\s*)?(\d{2}(?:\.\d{1,2})?)",
+                r"(?is)Class\s+X\s+Year\s+of\s+Passing:\s*Class\s+X\s+Percentage:\s*\nClass\s+X\s+Roll/Registration\s+Number:\s*\n\s*(?:19|20)\d{2}\s*\n\s*(\d{2}(?:\.\d{1,2})?)",
+                r"(?i)Class\s+(?:X|10(?:th)?)\s+Percentage\s*[:\-]?\s*(\d{2}(?:\.\d{1,2})?)\s*%?",
+            ]
+            for pat in x_patterns:
+                m = re.search(pat, page.text)
+                if m:
+                    val = float(m.group(1))
+                    snippet = self._make_snippet(page.text, m.start(), m.end())
+                    results.append(
+                        ExtractedField(
+                            field="class_x_percentage",
+                            value=val,
+                            currency=None,
+                            status=FieldExtractionStatus.EXTRACTED,
+                            source_page=page.page_number,
+                            evidence_snippet=snippet,
+                            confidence=0.93,
+                        )
+                    )
+                    break
+
+            # 3. Generic percentage if neither Class XII nor Class X was matched
+            if not results:
+                gen_pct = re.search(
+                    r"(?i)(?:overall\s+percentage|aggregate\s+percentage|percentage\s+of\s+marks|percentage)\s*[:\-]?\s*(\d{2}(?:\.\d{1,2})?)\s*%?",
+                    page.text,
+                )
+                if gen_pct:
+                    val = float(gen_pct.group(1))
+                    snippet = self._make_snippet(page.text, gen_pct.start(), gen_pct.end())
+                    results.append(
+                        ExtractedField(
+                            field="percentage",
+                            value=val,
+                            currency=None,
+                            status=FieldExtractionStatus.EXTRACTED,
+                            source_page=page.page_number,
+                            evidence_snippet=snippet,
+                            confidence=0.91,
+                        )
+                    )
+
+        return results
+
+    def _extract_submission_date(
+        self,
+        pages: List[PageContent],
+    ) -> Tuple[Optional[ExtractedField], Optional[str]]:
+        patterns = [
+            r"(?i)(?:payment/submission\s+date|submission\s+date|application\s+date|transaction\s+date)\s*[:\-]?\s*(\d{1,4}[-/.][A-Za-z0-9]+[-/.]\d{2,4})",
+        ]
+        for page in pages:
+            for pattern in patterns:
+                match = re.search(pattern, page.text)
+                if match:
+                    raw_date = match.group(1).strip()
+                    normalized, status, warn = self._normalize_date(raw_date)
+                    snippet = self._make_snippet(page.text, match.start(), match.end())
+                    return (
+                        ExtractedField(
+                            field="submission_date",
+                            value=normalized,
+                            currency=None,
+                            status=status,
+                            source_page=page.page_number,
+                            evidence_snippet=snippet,
+                            confidence=0.93 if status == FieldExtractionStatus.EXTRACTED else 0.65,
+                        ),
+                        warn,
+                    )
+        return None, None
+
+    def _extract_caste_category(self, pages: List[PageContent]) -> Optional[ExtractedField]:
+        pattern = r"(?i)\b(?:category|caste\s+category|social\s+category)\s*[:\-]\s*(General|OBC(?:-NCL)?|SC|ST|EWS)\b"
+        for page in pages:
+            match = re.search(pattern, page.text)
+            if match:
+                val = match.group(1).strip()
+                snippet = self._make_snippet(page.text, match.start(), match.end())
+                return ExtractedField(
+                    field="caste_category",
+                    value=val,
+                    currency=None,
+                    status=FieldExtractionStatus.EXTRACTED,
+                    source_page=page.page_number,
+                    evidence_snippet=snippet,
+                    confidence=0.92,
+                )
+        return None
+
+    def _extract_state_name(self, pages: List[PageContent]) -> Optional[ExtractedField]:
+        pattern = r"(?i)\b(?:state|domicile\s+state)\s*[:\-]\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\b"
+        for page in pages:
+            match = re.search(pattern, page.text)
+            if match:
+                val = match.group(1).splitlines()[0].strip()
+                snippet = self._make_snippet(page.text, match.start(), match.end())
+                return ExtractedField(
+                    field="state",
+                    value=val,
+                    currency=None,
+                    status=FieldExtractionStatus.EXTRACTED,
+                    source_page=page.page_number,
+                    evidence_snippet=snippet,
+                    confidence=0.90,
+                )
+        return None
 
     # -------------------------------------------------------------------------
     # SCHOLARSHIP_NOTICE
@@ -478,7 +812,7 @@ class LocalExtractionProvider(BaseExtractionProvider):
         # 1. Income rule (e.g. "Annual family income must not exceed Rs. 2,50,000")
         income_rule_patterns = [
             (
-                r"(?i)(?:family\s+)?income\s+(?:must\s+not\s+exceed|should\s+be\s+less\s+than|up\s+to|not\s+more\s+than|less\s+than\s+or\s+equal\s+to|<=|not\s+exceeding)\s*(?:(?:Rs\.?|INR|₹)\s*)?([\d,]{4,12})",
+                r"(?i)(?:family\s+)?income(?:\s+from\s+all\s+sources)?\s+(?:must\s+not\s+exceed|should\s+be\s+less\s+than|up\s+to|not\s+more\s+than|less\s+than\s+or\s+equal\s+to|<=|not\s+exceeding)\s*(?:(?:Rs\.?|INR|₹)\s*)?([\d,]{4,12})",
                 RuleOperator.LTE,
             ),
             (
@@ -513,7 +847,7 @@ class LocalExtractionProvider(BaseExtractionProvider):
         # 2. Percentage / Marks rule (e.g. "Minimum 60% marks in previous examination")
         marks_patterns = [
             (
-                r"(?i)(?:minimum|at\s+least|scoring\s+at\s+least|not\s+less\s+than|>=)\s*(\d{1,2}(?:\.\d+)?)\s*%\s*(?:marks)?",
+                r"(?i)(?:minimum(?:\s+of)?|at\s+least|scoring\s+at\s+least|not\s+less\s+than|>=)\s*(\d{1,2}(?:\.\d+)?)\s*%\s*(?:marks)?",
                 RuleOperator.GTE,
             ),
             (

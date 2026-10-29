@@ -1,4 +1,4 @@
-export type RAGResponseStatus = 'ANSWERED' | 'INSUFFICIENT_EVIDENCE' | 'NOT_INDEXED';
+export type RAGResponseStatus = 'ANSWERED' | 'INSUFFICIENT_EVIDENCE' | 'NOT_INDEXED' | 'ERROR';
 
 export interface SourceCitation {
   id: string;
@@ -9,6 +9,8 @@ export interface SourceCitation {
   relevanceScore?: number;
 }
 
+export type Citation = SourceCitation;
+
 export interface AssistantMessage {
   id: string;
   role: 'user' | 'assistant' | 'system';
@@ -16,6 +18,7 @@ export interface AssistantMessage {
   timestamp: string;
   status?: RAGResponseStatus;
   citations?: SourceCitation[];
+  warnings?: string[];
   opportunityContextId?: string;
   documentContextId?: string;
 }
@@ -39,6 +42,7 @@ export interface AssistantQueryRequest {
 
 export interface AssistantQueryResponse {
   status: RAGResponseStatus;
+  question?: string;
   answer: string;
   sources: SourceCitation[];
   suggestedFollowUps?: string[];
@@ -52,6 +56,7 @@ export interface ScholarshipNoticeItem {
   id: string;
   fileName: string;
   customTitle?: string;
+  issuer?: string;
   documentType: string;
   status: string;
   indexingStatus: 'NOT_INDEXED' | 'INDEXING' | 'INDEXED' | 'INDEX_FAILED';

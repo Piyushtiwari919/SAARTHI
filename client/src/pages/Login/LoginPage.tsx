@@ -6,14 +6,15 @@ import { Input } from '../../components/ui/Input.tsx';
 import { Card } from '../../components/ui/Card.tsx';
 import { useAuth } from '../../hooks/useAuth.ts';
 import { useToast } from '../../hooks/useToast.ts';
+import { USE_MOCKS } from '../../services/api.ts';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
   const toast = useToast();
 
-  const [email, setEmail] = useState('priya.sharma@nit.ac.in');
-  const [password, setPassword] = useState('password123');
+  const [email, setEmail] = useState(USE_MOCKS ? 'priya.sharma@nit.ac.in' : '');
+  const [password, setPassword] = useState(USE_MOCKS ? 'password123' : '');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -91,7 +92,7 @@ export const LoginPage: React.FC = () => {
           Student Sign In
         </h2>
         <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', margin: 0 }}>
-          Access your verified opportunity navigator and document vault
+          Access your opportunity navigator and private document vault
         </p>
       </div>
 
@@ -112,6 +113,7 @@ export const LoginPage: React.FC = () => {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            placeholder="Enter your password"
             leftIcon={<Lock size={16} />}
             required
           />
@@ -127,29 +129,33 @@ export const LoginPage: React.FC = () => {
             Sign In to Dashboard
           </Button>
 
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              margin: '8px 0',
-            }}
-          >
-            <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--border-subtle)' }} />
-            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>OR</span>
-            <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--border-subtle)' }} />
-          </div>
+          {USE_MOCKS && (
+            <>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  margin: '8px 0',
+                }}
+              >
+                <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--border-subtle)' }} />
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>OR</span>
+                <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--border-subtle)' }} />
+              </div>
 
-          <Button
-            type="button"
-            variant="outline"
-            size="md"
-            onClick={handleDemoLogin}
-            disabled={isLoading}
-            style={{ width: '100%' }}
-          >
-            Sign In with Demo Student Profile
-          </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="md"
+                onClick={handleDemoLogin}
+                disabled={isLoading}
+                style={{ width: '100%' }}
+              >
+                Sign In with Demo Student Profile
+              </Button>
+            </>
+          )}
         </form>
 
         <div
@@ -180,7 +186,7 @@ export const LoginPage: React.FC = () => {
         }}
       >
         <Lock size={12} />
-        <span>End-to-end encrypted student authentication</span>
+        <span>Authenticated student session with private document storage</span>
       </div>
     </div>
   );

@@ -53,6 +53,20 @@ export class EligibilityController {
     }
   }
 
+  public async evaluateAllOpportunities(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const userId = req.user!.id;
+      const summaries = await eligibilityService.evaluateAllOpportunities(userId);
+      res.status(200).json(summaries);
+    } catch (err) {
+      next(err);
+    }
+  }
+
   public async getResultById(
     req: Request,
     res: Response,

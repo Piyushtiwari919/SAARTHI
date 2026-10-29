@@ -72,19 +72,21 @@ describe('Document Background Queue & Worker Pipeline Tests', () => {
       expect(mockDoc.save).not.toHaveBeenCalled();
     });
 
-    it('Successfully processes valid document and marks READY with extracted attributes', async () => {
+    it('Passes actual documentType (e.g. MARKSHEET or OTHER) to FastAPI without coercing to INCOME_CERTIFICATE', async () => {
       const mockDoc = {
-        id: 'doc_valid_income',
+        id: 'doc_aktu_exam_form',
         status: 'QUEUED',
-        fileName: 'income_cert.pdf',
+        fileName: 'AKTU_EXAM_FORM.pdf',
         mimeType: 'application/pdf',
-        documentType: 'INCOME_CERTIFICATE',
-        storageKey: 'key_income_cert.pdf',
-        extractedAttributes: [],
+        documentType: 'MARKSHEET',
+        storageKey: 'key_aktu.pdf',
+        extractedAttributes: [] as any[],
+        warnings: [] as string[],
         pageCount: 1,
         save: vi.fn().mockResolvedValue(true),
       };
       vi.spyOn(DocumentModel, 'findById').mockResolvedValue(mockDoc as any);
+      vi.spyOn(DocumentModel, 'findByIdAndUpdate').mockResolvedValue({} as any);
 
       const mockStorage = {
         getStream: vi.fn().mockResolvedValue(Readable.from(Buffer.from('%PDF-1.7 mock data'))),
@@ -94,7 +96,77 @@ describe('Document Background Queue & Worker Pipeline Tests', () => {
       };
       vi.spyOn(storageModule, 'getStorageProvider').mockReturnValue(mockStorage as any);
 
-      global.fetch = vi.fn().mockResolvedValueOnce({
+      const fetchSpy = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          processing_status: 'SUCCESS',
+          page_count: 1,
+          warnings: [],
+          extracted_fields: [
+            {
+              field: 'applicant_name',
+              value: 'PIYUSH TIWARI',
+              confidence: 0.94,
+              source_page: 1,
+              evidence_snippet: 'Name : PIYUSH TIWARI',
+              status: 'EXTRACTED',
+            },
+            {
+              field: 'class_xii_percentage',
+              value: 76.2,
+              unit: '%',
+              confidence: 0.93,
+              source_page: 1,
+              evidence_snippet: '12th 76.2%',
+              status: 'EXTRACTED',
+            },
+          ],
+        }),
+      } as any);
+      global.fetch = fetchSpy;
+
+      const result = await processDocumentJob({
+        documentId: 'doc_aktu_exam_form',
+        processingVersion: 1,
+        requestId: 'req_aktu',
+      });
+
+      expect(result.success).toBe(true);
+      const extractCallBody = fetchSpy.mock.calls[0][1].body as FormData;
+      expect(extractCallBody.get('document_type')).toBe('MARKSHEET');
+      expect(extractCallBody.get('document_type')).not.toBe('INCOME_CERTIFICATE');
+      expect(mockDoc.extractedAttributes.map((a: any) => a.field)).toEqual([
+        'applicant_name',
+        'class_xii_percentage',
+      ]);
+    });
+
+    it('Successfully processes valid document and marks READY with extracted attributes', async () => {
+      const mockDoc = {
+        id: 'doc_valid_income',
+        status: 'QUEUED',
+        fileName: 'income_cert.pdf',
+        mimeType: 'application/pdf',
+        documentType: 'INCOME_CERTIFICATE',
+        storageKey: 'key_income_cert.pdf',
+        extractedAttributes: [] as any[],
+        warnings: [] as string[],
+        pageCount: 1,
+        save: vi.fn().mockResolvedValue(true),
+      };
+      vi.spyOn(DocumentModel, 'findById').mockResolvedValue(mockDoc as any);
+      vi.spyOn(DocumentModel, 'findByIdAndUpdate').mockResolvedValue({} as any);
+
+      const mockStorage = {
+        getStream: vi.fn().mockResolvedValue(Readable.from(Buffer.from('%PDF-1.7 mock data'))),
+        save: vi.fn(),
+        delete: vi.fn(),
+        exists: vi.fn(),
+      };
+      vi.spyOn(storageModule, 'getStorageProvider').mockReturnValue(mockStorage as any);
+
+      global.fetch = vi.fn().mockResolvedValue({
         ok: true,
         status: 200,
         json: async () => ({
@@ -240,4 +312,3 @@ describe('Document Background Queue & Worker Pipeline Tests', () => {
     });
   });
 });
-

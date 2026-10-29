@@ -3,12 +3,23 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { PageHeader } from '../../components/layout/PageHeader.tsx';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card.tsx';
 import { Button } from '../../components/ui/Button.tsx';
+import { Badge } from '../../components/ui/Badge.tsx';
 import { DocumentStatusBadge } from '../../components/documents/DocumentStatusBadge.tsx';
 import { DocumentProcessingTimeline } from '../../components/documents/DocumentProcessingTimeline.tsx';
+import { formatAttributeDisplayValue } from '../../components/documents/DocumentCard.tsx';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog.tsx';
 import { LoadingState } from '../../components/ui/LoadingState.tsx';
 import { ErrorState } from '../../components/ui/ErrorState.tsx';
-import { ArrowLeft, Lock, BookOpen, Trash2, RotateCcw, Shield } from 'lucide-react';
+import {
+  ArrowLeft,
+  Lock,
+  BookOpen,
+  Trash2,
+  RotateCcw,
+  Shield,
+  MessageSquareText,
+  AlertTriangle,
+} from 'lucide-react';
 import { documentService } from '../../services/document.service.ts';
 import { USE_MOCKS } from '../../services/api.ts';
 import { DOCUMENT_TYPE_LABELS } from '../../types/document.ts';
@@ -142,6 +153,42 @@ export const DocumentDetailsPage: React.FC = () => {
   const isFailed = document.status === 'FAILED';
   const typeLabel = DOCUMENT_TYPE_LABELS[document.category] || document.category;
 
+  const allAttrs = (document.extractedAttributes || []).filter((a) => a.field !== 'currency');
+  const extractedFields = allAttrs.filter(
+    (a) =>
+      a.status === 'EXTRACTED' &&
+      a.value !== null &&
+      a.value !== undefined &&
+      String(a.value).trim() !== ''
+  );
+  const reviewFields = allAttrs.filter(
+    (a) =>
+      a.status === 'NEEDS_REVIEW' &&
+      a.value !== null &&
+      a.value !== undefined &&
+      String(a.value).trim() !== ''
+  );
+  const missingFields = allAttrs.filter(
+    (a) =>
+      a.status === 'NOT_FOUND' ||
+      a.value === null ||
+      a.value === undefined ||
+      String(a.value).trim() === ''
+  );
+
+  const renderAttributeStatus = (status?: string) => {
+    switch (status?.toUpperCase()) {
+      case 'EXTRACTED':
+        return <Badge variant="success" size="sm">Extracted</Badge>;
+      case 'NEEDS_REVIEW':
+        return <Badge variant="warning" size="sm">Needs Review</Badge>;
+      case 'NOT_FOUND':
+        return <Badge variant="neutral" size="sm">Not Found</Badge>;
+      default:
+        return null;
+    }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* Navigation Breadcrumb */}
@@ -159,7 +206,14 @@ export const DocumentDetailsPage: React.FC = () => {
         description={`${typeLabel} • ${document.fileName} (${formatFileSize(document.fileSizeBytes)})`}
         badge={<DocumentStatusBadge status={document.status} size="md" />}
         actions={
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            {document.status === 'READY' && (
+              <Link to={`/app/assistant?documentId=${document.id}`} style={{ textDecoration: 'none' }}>
+                <Button variant="primary" size="sm" leftIcon={<MessageSquareText size={14} />}>
+                  Ask Questions About This Document
+                </Button>
+              </Link>
+            )}
             {isFailed && (
               <Button variant="primary" size="sm" onClick={handleRetry} leftIcon={<RotateCcw size={14} />}>
                 Retry Processing
@@ -177,6 +231,30 @@ export const DocumentDetailsPage: React.FC = () => {
           </div>
         }
       />
+
+      {/* Warnings Banner */}
+      {document.warnings && document.warnings.length > 0 && (
+        <div
+          style={{
+            padding: '12px 16px',
+            backgroundColor: 'var(--warning-light, #FFFBEB)',
+            border: '1px solid var(--warning-border, #FDE68A)',
+            borderRadius: 'var(--radius-card)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '6px',
+            fontSize: 'var(--text-xs)',
+            color: 'var(--warning-dark, #92400E)',
+          }}
+        >
+          {document.warnings.map((w, idx) => (
+            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <AlertTriangle size={15} style={{ flexShrink: 0 }} />
+              <span>{w}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Two-Column Responsive Layout */}
       <div
@@ -233,11 +311,11 @@ export const DocumentDetailsPage: React.FC = () => {
             </CardContent>
           </Card>
 
-          {/* Evidence Attributes Card */}
+          {/* Extracted Fields Card */}
           <Card>
             <CardHeader>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <CardTitle>Extracted Evidence Attributes ({document.extractedAttributes?.length || 0})</CardTitle>
+                <CardTitle>Extracted Fields ({extractedFields.length})</CardTitle>
                 <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                   Grounded in document clauses
                 </span>
@@ -245,9 +323,9 @@ export const DocumentDetailsPage: React.FC = () => {
             </CardHeader>
 
             <CardContent>
-              {document.extractedAttributes && document.extractedAttributes.length > 0 ? (
+              {extractedFields.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {document.extractedAttributes.map((attr) => (
+                  {extractedFields.map((attr) => (
                     <div
                       key={attr.id}
                       style={{
@@ -261,19 +339,39 @@ export const DocumentDetailsPage: React.FC = () => {
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 500 }}>
-                          {attr.label || attr.field}
-                        </span>
-                        {attr.confidence && (
-                          <span style={{ fontSize: '11px', color: 'var(--brand-primary)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+                            {attr.label || attr.field}
+                          </span>
+                          {renderAttributeStatus(attr.status)}
+                        </div>
+                        {attr.confidence !== undefined && attr.confidence > 0 && (
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                             Confidence: {Math.round(attr.confidence * 100)}%
                           </span>
                         )}
                       </div>
 
-                      <div style={{ fontSize: 'var(--text-lg)', fontWeight: 700, color: 'var(--text-primary)' }}>
-                        {String(attr.value)}
+                      <div style={{ fontSize: 'var(--text-lg)', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>
+                        {formatAttributeDisplayValue(attr)}
                       </div>
+
+                      {attr.evidenceSnippet && (
+                        <div
+                          style={{
+                            fontSize: '12px',
+                            color: 'var(--text-secondary)',
+                            fontStyle: 'italic',
+                            padding: '6px 10px',
+                            backgroundColor: 'var(--surface)',
+                            borderRadius: 'var(--radius-xs)',
+                            borderLeft: '3px solid var(--brand-primary)',
+                            marginTop: '2px',
+                          }}
+                        >
+                          "{attr.evidenceSnippet}"
+                        </div>
+                      )}
 
                       <div
                         style={{
@@ -311,12 +409,83 @@ export const DocumentDetailsPage: React.FC = () => {
                   {isFailed
                     ? 'Processing failed before attributes could be extracted. Please retry with a clearer document.'
                     : document.status === 'UPLOADED'
-                    ? 'Document uploaded securely to private storage. Extraction pipeline worker is awaiting job dispatch.'
-                    : 'Extracted attributes will appear here once background OCR and analysis complete.'}
+                      ? 'Document uploaded securely to private storage. Extraction pipeline worker is awaiting job dispatch.'
+                      : 'No verified attributes extracted from this document.'}
                 </div>
               )}
             </CardContent>
           </Card>
+
+          {/* Fields Requiring Review */}
+          {reviewFields.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Fields Requiring Review ({reviewFields.length})</CardTitle>
+              </CardHeader>
+              <CardContent style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {reviewFields.map((attr) => (
+                  <div
+                    key={attr.id}
+                    style={{
+                      padding: '12px 14px',
+                      borderRadius: 'var(--radius-sm)',
+                      backgroundColor: 'var(--warning-light, #FFFBEB)',
+                      border: '1px solid var(--warning-border, #FDE68A)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' }}>
+                        {attr.label || attr.field}
+                      </span>
+                      {renderAttributeStatus(attr.status)}
+                    </div>
+                    <div style={{ fontSize: 'var(--text-base)', fontWeight: 700, color: 'var(--text-primary)' }}>
+                      {formatAttributeDisplayValue(attr)}
+                    </div>
+                    {attr.evidenceSnippet && (
+                      <div style={{ fontSize: '11px', fontStyle: 'italic', color: 'var(--text-secondary)' }}>
+                        "{attr.evidenceSnippet}" {attr.sourcePage ? `(Page ${attr.sourcePage})` : ''}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Missing Expected Fields */}
+          {missingFields.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Missing Expected Fields ({missingFields.length})</CardTitle>
+              </CardHeader>
+              <CardContent style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                {missingFields.map((attr) => (
+                  <div
+                    key={attr.id}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: 'var(--radius-xs)',
+                      backgroundColor: 'var(--surface-muted)',
+                      border: '1px solid var(--border-subtle)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      fontSize: 'var(--text-xs)',
+                    }}
+                  >
+                    <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>
+                      {attr.label || attr.field}
+                    </span>
+                    <Badge variant="neutral" size="sm">Not Found</Badge>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Right Column: Processing Timeline */}

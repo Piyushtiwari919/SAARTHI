@@ -70,7 +70,13 @@ export class DocumentService {
   ): Promise<IDocumentRecord[]> {
     const query: Record<string, unknown> = { ownerId };
     if (filterStatus && filterStatus !== 'ALL') {
-      query.status = filterStatus;
+      if (filterStatus === 'PROCESSING') {
+        query.status = {
+          $in: ['UPLOADED', 'QUEUED', 'PROCESSING', 'OCR_COMPLETE', 'ANALYZING', 'INDEXING'],
+        };
+      } else {
+        query.status = filterStatus;
+      }
     }
     return DocumentModel.find(query).sort({ createdAt: -1 });
   }
@@ -125,4 +131,3 @@ export class DocumentService {
     await DocumentModel.deleteOne({ _id: documentId });
   }
 }
-

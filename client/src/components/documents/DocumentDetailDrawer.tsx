@@ -1,11 +1,23 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import type { Document } from '../../types/document.ts';
 import { DOCUMENT_TYPE_LABELS } from '../../types/document.ts';
 import { Modal } from '../ui/Modal.tsx';
 import { Button } from '../ui/Button.tsx';
+import { Badge } from '../ui/Badge.tsx';
 import { DocumentStatusBadge } from './DocumentStatusBadge.tsx';
 import { DocumentProcessingTimeline } from './DocumentProcessingTimeline.tsx';
-import { FileText, Lock, Trash2, RotateCcw, BookOpen, Shield } from 'lucide-react';
+import { formatAttributeDisplayValue, getDisplayableAttributes } from './DocumentCard.tsx';
+import {
+  FileText,
+  Lock,
+  Trash2,
+  RotateCcw,
+  BookOpen,
+  ExternalLink,
+  MessageSquareText,
+  AlertTriangle,
+} from 'lucide-react';
 import { formatFileSize, formatDate } from '../../utils/formatters.ts';
 
 export interface DocumentDetailDrawerProps {
@@ -27,6 +39,20 @@ export const DocumentDetailDrawer: React.FC<DocumentDetailDrawerProps> = ({
 
   const isFailed = document.status === 'FAILED';
   const typeLabel = DOCUMENT_TYPE_LABELS[document.category] || document.category;
+  const visibleAttributes = getDisplayableAttributes(document.extractedAttributes);
+
+  const renderAttributeStatus = (status?: string) => {
+    switch (status?.toUpperCase()) {
+      case 'EXTRACTED':
+        return <Badge variant="success" size="sm">Extracted</Badge>;
+      case 'NEEDS_REVIEW':
+        return <Badge variant="warning" size="sm">Needs Review</Badge>;
+      case 'NOT_FOUND':
+        return <Badge variant="neutral" size="sm">Not Found</Badge>;
+      default:
+        return null;
+    }
+  };
 
   return (
     <Modal
@@ -58,7 +84,7 @@ export const DocumentDetailDrawer: React.FC<DocumentDetailDrawerProps> = ({
       }
       maxWidth="680px"
       footer={
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', flexWrap: 'wrap', gap: '8px' }}>
           <div>
             {onDelete && (
               <Button
@@ -73,7 +99,21 @@ export const DocumentDetailDrawer: React.FC<DocumentDetailDrawerProps> = ({
             )}
           </div>
 
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+            {document.status === 'READY' && (
+              <Link to={`/app/assistant?documentId=${document.id}`} onClick={onClose} style={{ textDecoration: 'none' }}>
+                <Button variant="primary" size="sm" leftIcon={<MessageSquareText size={13} />}>
+                  Ask Questions About This Document
+                </Button>
+              </Link>
+            )}
+
+            <Link to={`/app/documents/${document.id}`} onClick={onClose} style={{ textDecoration: 'none' }}>
+              <Button variant="outline" size="sm" rightIcon={<ExternalLink size={13} />}>
+                Full Page Analysis
+              </Button>
+            </Link>
+
             {isFailed && onRetry && (
               <Button
                 variant="primary"
@@ -84,6 +124,7 @@ export const DocumentDetailDrawer: React.FC<DocumentDetailDrawerProps> = ({
                 Retry Processing
               </Button>
             )}
+
             <Button variant="secondary" size="sm" onClick={onClose}>
               Close
             </Button>
@@ -102,50 +143,72 @@ export const DocumentDetailDrawer: React.FC<DocumentDetailDrawerProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            flexWrap: 'wrap',
             gap: '12px',
-          }}
-        >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-            <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Current Processing Status
-            </span>
-            <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-primary)' }}>
-              {document.statusMessage || 'Processing background job pipeline'}
-            </span>
-          </div>
-
-          <DocumentStatusBadge status={document.status} size="md" />
-        </div>
-
-        {/* Document Metadata Grid */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-            gap: '12px',
-            backgroundColor: 'var(--surface-subtle)',
-            padding: '14px 16px',
-            borderRadius: 'var(--radius-sm)',
-            border: '1px solid var(--border-subtle)',
           }}
         >
           <div>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>DOCUMENT TYPE</div>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              CURRENT STATUS
+            </span>
+            <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-primary)', marginTop: '2px' }}>
+              {document.statusMessage || (isFailed ? 'Processing failed' : 'Information extraction ready')}
+            </div>
+          </div>
+          <DocumentStatusBadge status={document.status} size="md" />
+        </div>
+
+        {/* Warnings if present */}
+        {document.warnings && document.warnings.length > 0 && (
+          <div
+            style={{
+              padding: '12px 14px',
+              backgroundColor: 'var(--warning-light, #FFFBEB)',
+              border: '1px solid var(--warning-border, #FDE68A)',
+              borderRadius: 'var(--radius-sm)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px',
+              fontSize: 'var(--text-xs)',
+              color: 'var(--warning-dark, #92400E)',
+            }}
+          >
+            {document.warnings.map((w, idx) => (
+              <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <AlertTriangle size={14} style={{ flexShrink: 0 }} />
+                <span>{w}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Metadata Grid */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+            gap: '14px',
+            padding: '14px 16px',
+            backgroundColor: 'var(--surface)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-sm)',
+          }}
+        >
+          <div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>CATEGORY</div>
             <div style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text-primary)', marginTop: '2px' }}>
               {typeLabel}
             </div>
           </div>
 
           <div>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>UPLOADED ON</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>UPLOAD DATE</div>
             <div style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text-primary)', marginTop: '2px' }}>
               {formatDate(document.createdAt)}
             </div>
           </div>
 
           <div>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>FILE FORMAT</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>FORMAT & SIZE</div>
             <div style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text-primary)', marginTop: '2px' }}>
               {document.mimeType.split('/').pop()?.toUpperCase() || 'PDF'} ({formatFileSize(document.fileSizeBytes)})
             </div>
@@ -184,16 +247,16 @@ export const DocumentDetailDrawer: React.FC<DocumentDetailDrawerProps> = ({
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <h4 style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-primary)' }}>
-              Extracted Evidence Attributes ({document.extractedAttributes.length})
+              Extracted Evidence Attributes ({visibleAttributes.length})
             </h4>
             <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
               Grounded in document clauses
             </span>
           </div>
 
-          {document.extractedAttributes.length > 0 ? (
+          {visibleAttributes.length > 0 ? (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '10px' }}>
-              {document.extractedAttributes.map((attr) => (
+              {visibleAttributes.map((attr) => (
                 <div
                   key={attr.id}
                   style={{
@@ -206,12 +269,34 @@ export const DocumentDetailDrawer: React.FC<DocumentDetailDrawerProps> = ({
                     gap: '4px',
                   }}
                 >
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                    {attr.label || attr.field}
-                  </span>
-                  <div style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--text-primary)' }}>
-                    {String(attr.value)}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+                      {attr.label || attr.field}
+                    </span>
+                    {renderAttributeStatus(attr.status)}
                   </div>
+
+                  <div style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    {formatAttributeDisplayValue(attr)}
+                  </div>
+
+                  {attr.evidenceSnippet && (
+                    <div
+                      style={{
+                        fontSize: '11px',
+                        color: 'var(--text-secondary)',
+                        fontStyle: 'italic',
+                        padding: '4px 6px',
+                        backgroundColor: 'var(--surface)',
+                        borderRadius: 'var(--radius-xs)',
+                        borderLeft: '2px solid var(--brand-primary)',
+                        marginTop: '2px',
+                      }}
+                    >
+                      "{attr.evidenceSnippet}"
+                    </div>
+                  )}
+
                   <div
                     style={{
                       display: 'flex',
@@ -247,29 +332,9 @@ export const DocumentDetailDrawer: React.FC<DocumentDetailDrawerProps> = ({
             >
               {isFailed
                 ? 'Processing failed before attributes could be extracted. Please retry with a clearer document.'
-                : 'Attributes will appear here once background OCR and rule analysis complete.'}
+                : 'No structured fields were extracted from this document.'}
             </div>
           )}
-        </div>
-
-        {/* Privacy Note */}
-        <div
-          style={{
-            padding: '10px 14px',
-            backgroundColor: 'var(--surface-subtle)',
-            border: '1px solid var(--border-subtle)',
-            borderRadius: 'var(--radius-xs)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            fontSize: 'var(--text-xs)',
-            color: 'var(--text-secondary)',
-          }}
-        >
-          <Shield size={14} style={{ color: 'var(--brand-primary)', flexShrink: 0 }} />
-          <span>
-            Your document is private. Upload only the documents you are comfortable processing.
-          </span>
         </div>
       </div>
     </Modal>

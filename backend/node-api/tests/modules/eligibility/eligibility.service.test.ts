@@ -73,7 +73,7 @@ describe('EligibilityService Unit & Authorization Tests', () => {
         { field: 'percentage', value: 85, unit: '%', status: 'EXTRACTED' },
       ],
       // Missing INCOME_CERTIFICATE
-      uploadedDocTypes: ['MARKSHEET'],
+      uploadedDocTypes: ['INCOME_CERTIFICATE' === 'MARKSHEET' ? 'INCOME_CERTIFICATE' : 'MARKSHEET'],
     });
     vi.mocked(mockRepo.saveEvaluationResult).mockResolvedValue({} as any);
 
@@ -119,5 +119,30 @@ describe('EligibilityService Unit & Authorization Tests', () => {
       new AppError('Opportunity not found: nonexistent_opp', 404)
     );
   });
-});
 
+  it('getAllEligibilitySummaries returns empty list for brand-new user without auto-evaluating opportunities', async () => {
+    vi.mocked(mockRepo.getEvaluationResultsForUser).mockResolvedValue([]);
+
+    const results = await service.getAllEligibilitySummaries('brand_new_user_001');
+
+    expect(results).toEqual([]);
+    expect(mockRepo.getAllActiveOpportunities).not.toHaveBeenCalled();
+    expect(mockRepo.saveEvaluationResult).not.toHaveBeenCalled();
+  });
+
+  it('evaluateAllOpportunities explicitly evaluates all active opportunities on demand', async () => {
+    vi.mocked(mockRepo.getAllActiveOpportunities).mockResolvedValue([mockOpportunity as any]);
+    vi.mocked(mockRepo.getOpportunityById).mockResolvedValue(mockOpportunity as any);
+    vi.mocked(mockRepo.collectUserEvidence).mockResolvedValue({
+      evidence: [],
+      uploadedDocTypes: [],
+    });
+    vi.mocked(mockRepo.saveEvaluationResult).mockResolvedValue({} as any);
+
+    const results = await service.evaluateAllOpportunities('user_123');
+
+    expect(results).toHaveLength(1);
+    expect(results[0].opportunityId).toBe('opp_test_01');
+    expect(mockRepo.saveEvaluationResult).toHaveBeenCalledOnce();
+  });
+});

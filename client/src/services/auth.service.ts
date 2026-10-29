@@ -12,7 +12,8 @@ class AuthService {
     }
 
     try {
-      const user = await ApiService.request<UserProfile>('/api/auth/me');
+      const res = await ApiService.request<any>('/api/auth/me');
+      const user = (res && typeof res === 'object' && 'user' in res && res.user) ? res.user : res;
       this.currentUser = user;
       return user;
     } catch {

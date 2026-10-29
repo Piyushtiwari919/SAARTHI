@@ -82,6 +82,8 @@ async def test_extract_income_certificate_missing_fields():
     # Missing income
     assert field_map["annual_family_income"].status == FieldExtractionStatus.NOT_FOUND
     assert field_map["annual_family_income"].value is None
+    # Blank companion currency field must not be emitted when income is NOT_FOUND
+    assert "currency" not in field_map
 
     # Missing cert number
     assert field_map["certificate_number"].status == FieldExtractionStatus.NOT_FOUND
@@ -118,6 +120,64 @@ async def test_ambiguous_date_marked_needs_review():
     assert date_f.status == FieldExtractionStatus.NEEDS_REVIEW
     assert date_f.value == "05/06/2024"
     assert any("Ambiguous date" in w for w in result.warnings)
+
+
+@pytest.mark.asyncio
+async def test_extract_aktu_exam_form_no_false_income_or_issue_date():
+    provider = LocalExtractionProvider()
+    pages = [
+        PageContent(
+            page_number=1,
+            text=(
+                "Dr. A. P. J. Abdul Kalam Technical University\n"
+                "Uttar Pradesh, Lucknow\n"
+                "Pre-Registration Against Vacant Seats and Management Quota:- 2024-25\n"
+                "Bachelor of Technology(Computer Science and Engineering)\n"
+                "Form Number: ERN240104855\n"
+                "Payment/Submission Status : Submitted\n"
+                "Payment/Submission Date : 2024-12-28 13:34:59\n"
+                "Full Name of the Applicant : PIYUSH TIWARI\n"
+                "Category : General\n"
+                "State : Bihar\n"
+                "Combined Family Income : Not Applicable\n"
+                "Class X Year of Passing: Class X Percentage:\n"
+                "Class X Roll/Registration Number:\n"
+                "2021\n"
+                "73.33\n"
+                "22176686\n"
+                "Class XII Year of Passing Final\n"
+                "Examination:\n"
+                "Class XII Percentage:\n"
+                "Class XII Roll/Registration Number:\n"
+                "2023\n"
+                "79.60\n"
+            ),
+            status="TEXT_EXTRACTED",
+        )
+    ]
+
+    result = await provider.extract(DocumentType.OTHER, pages)
+    field_map = {f.field: f for f in result.extracted_fields}
+
+    # Must NEVER fabricate annual_family_income, currency, or mislabel Payment/Submission Date as issue_date
+    assert "annual_family_income" not in field_map
+    assert "currency" not in field_map
+    assert "issue_date" not in field_map
+
+    # Must extract genuine fields present in the exam form
+    assert field_map["applicant_name"].value == "PIYUSH TIWARI"
+    assert field_map["form_number"].value == "ERN240104855"
+    assert "Abdul Kalam Technical University" in field_map["institution"].value
+    assert "Bachelor of Technology" in field_map["course"].value
+    assert field_map["submission_date"].value == "2024-12-28"
+    assert field_map["class_xii_percentage"].value == 79.6
+    assert field_map["class_x_percentage"].value == 73.33
+    assert field_map["caste_category"].value == "General"
+    assert field_map["state"].value == "Bihar"
+
+    # When uploaded as MARKSHEET, emits a category mismatch warning
+    marksheet_res = await provider.extract(DocumentType.MARKSHEET, pages)
+    assert any("Uploaded with category MARKSHEET" in w for w in marksheet_res.warnings)
 
 
 @pytest.mark.asyncio

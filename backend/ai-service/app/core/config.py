@@ -73,11 +73,11 @@ class Settings(BaseSettings):
         description="Directory path for persistent ChromaDB vector storage",
     )
     RAG_TOP_K: int = Field(
-        default=5,
+        default=8,
         description="Default number of relevant chunks to retrieve for RAG",
     )
     RAG_RELEVANCE_THRESHOLD: float = Field(
-        default=0.35,
+        default=0.10,
         description="Minimum cosine relevance score threshold to consider a chunk relevant",
     )
 

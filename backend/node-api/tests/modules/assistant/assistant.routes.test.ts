@@ -76,7 +76,7 @@ describe('Assistant RAG API Routes Integration Tests', () => {
     expect(res.body.sources[0].page).toBe(2);
   });
 
-  it('GET /api/v1/assistant/documents returns list of scholarship notices with indexing status', async () => {
+  it('GET /api/v1/assistant/documents returns list of user documents (Mode A & Mode B) with indexing status', async () => {
     vi.spyOn(AssistantService, 'getAvailableNotices').mockResolvedValueOnce([
       {
         id: 'doc_notice_01',
@@ -88,6 +88,16 @@ describe('Assistant RAG API Routes Integration Tests', () => {
         pageCount: 4,
         createdAt: new Date(),
       },
+      {
+        id: 'doc_aktu_02',
+        fileName: 'AKTU_EXAM_FORM.pdf',
+        customTitle: 'AKTU EXAM FORM',
+        documentType: 'OTHER',
+        status: 'READY',
+        indexingStatus: 'INDEXED',
+        pageCount: 1,
+        createdAt: new Date(),
+      },
     ]);
 
     const res = await request(app)
@@ -96,7 +106,27 @@ describe('Assistant RAG API Routes Integration Tests', () => {
 
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
+    expect(res.body).toHaveLength(2);
     expect(res.body[0].indexingStatus).toBe('INDEXED');
+    expect(res.body[1].documentType).toBe('OTHER');
+  });
+
+  it('POST /api/v1/assistant/query returns 403 when user queries another users document', async () => {
+    const { DocumentModel } = await import('../../../src/modules/documents/document.model.js');
+    vi.spyOn(DocumentModel, 'findById').mockResolvedValueOnce({
+      id: 'doc_foreign_999',
+      ownerId: { toString: () => 'other_owner_user_999' },
+      fileName: 'Other_User_Form.pdf',
+      documentType: 'OTHER',
+      status: 'READY',
+    } as any);
+
+    const res = await request(app)
+      .post('/api/v1/assistant/query')
+      .set('Authorization', `Bearer ${validUserToken}`)
+      .send({ documentId: 'doc_foreign_999', question: 'What is the candidate name?' });
+
+    expect(res.status).toBe(403);
+    expect(res.body.message).toContain('You do not have permission to query this document');
   });
 });
-

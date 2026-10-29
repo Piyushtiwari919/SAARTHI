@@ -42,7 +42,8 @@ async function streamToBuffer(stream: Readable): Promise<Buffer> {
 
 export class AssistantService {
   /**
-   * Execute source-grounded RAG query against an authorized scholarship notice.
+   * Execute source-grounded RAG query against an authorized user-owned document
+   * (supports both Mode A personal/academic documents and Mode B scholarship notices).
    */
   public static async query(
     userId: string,
@@ -51,7 +52,7 @@ export class AssistantService {
     topK?: number
   ): Promise<AssistantQueryResponse> {
     if (!documentId || !documentId.trim()) {
-      throw new AppError('Document ID is required to query an opportunity notice', 400);
+      throw new AppError('Document ID is required to query a document', 400);
     }
 
     if (!question || !question.trim()) {
@@ -68,20 +69,12 @@ export class AssistantService {
       throw new AppError(`Document not found: ${documentId}`, 404);
     }
 
-    // Strict access control: verify user owns this document or document is public
+    // Strict access control: verify user owns this document
     if (doc.ownerId.toString() !== userId) {
       throw new AppError('You do not have permission to query this document', 403);
     }
 
-    // 2. Strict category verification: only SCHOLARSHIP_NOTICE is supported for RAG
-    if (doc.documentType !== 'SCHOLARSHIP_NOTICE') {
-      throw new AppError(
-        `Category '${doc.documentType}' is not supported for Q&A. Only official SCHOLARSHIP_NOTICE documents can be queried.`,
-        400
-      );
-    }
-
-    // 3. Call internal FastAPI RAG query endpoint with service-to-service token
+    // 2. Call internal FastAPI RAG query endpoint with service-to-service token
     const url = `${env.AI_SERVICE_URL}/internal/v1/rag/query`;
     let response: Response;
 
@@ -95,7 +88,7 @@ export class AssistantService {
         body: JSON.stringify({
           document_id: documentId,
           question: question.trim(),
-          top_k: topK || 5,
+          top_k: topK || 8,
         }),
       });
     } catch (networkErr: unknown) {
@@ -152,7 +145,7 @@ export class AssistantService {
   }
 
   /**
-   * Index a scholarship notice into the vector store.
+   * Index an authorized user-owned document into the vector store.
    * Reads the file from private object storage and sends it to FastAPI internal indexing endpoint.
    */
   public static async indexDocument(userId: string, documentId: string): Promise<IndexingResult> {
@@ -163,10 +156,6 @@ export class AssistantService {
 
     if (doc.ownerId.toString() !== userId) {
       throw new AppError('You do not have permission to index this document', 403);
-    }
-
-    if (doc.documentType !== 'SCHOLARSHIP_NOTICE') {
-      throw new AppError('Only SCHOLARSHIP_NOTICE documents can be indexed for question answering', 400);
     }
 
     // Set indexing status to INDEXING
@@ -185,7 +174,8 @@ export class AssistantService {
       formData.append('file', fileBlob, doc.fileName);
       formData.append('document_id', doc.id);
       formData.append('document_title', doc.customTitle || doc.fileName);
-      formData.append('category', 'SCHOLARSHIP_NOTICE');
+      formData.append('category', doc.documentType || 'OTHER');
+      formData.append('allow_personal_document', 'true');
 
       // 3. Post to FastAPI internal indexing endpoint
       const url = `${env.AI_SERVICE_URL}/internal/v1/rag/index`;
@@ -234,24 +224,43 @@ export class AssistantService {
   }
 
   /**
-   * Retrieve available scholarship notices belonging to the user for selection in the Assistant UI.
+   * Retrieve all user-owned documents available for selection in the Assistant UI
+   * (Mode A: owned documents such as marksheets, forms, certificates; Mode B: scholarship notices).
    */
   public static async getAvailableNotices(userId: string) {
-    const notices = await DocumentModel.find({
+    const docs = await DocumentModel.find({
       ownerId: userId,
-      documentType: 'SCHOLARSHIP_NOTICE',
     }).sort({ createdAt: -1 });
 
-    return notices.map((n) => ({
-      id: n.id,
-      fileName: n.fileName,
-      customTitle: n.customTitle || n.fileName,
-      documentType: n.documentType,
-      status: n.status,
-      indexingStatus: n.indexingStatus || 'NOT_INDEXED',
-      pageCount: n.pageCount || 1,
-      createdAt: n.createdAt,
-    }));
+    return docs.map((n) => {
+      const attrs = Array.isArray(n.extractedAttributes) ? n.extractedAttributes : [];
+      const titleAttr = attrs.find(
+        (a) =>
+          (a.field === 'opportunity_title' || a.field === 'scholarship_title' || a.field === 'title') &&
+          a.status !== 'NOT_FOUND' &&
+          a.value
+      );
+      const issuerAttr = attrs.find(
+        (a) =>
+          (a.field === 'issuer' || a.field === 'institution' || a.field === 'issuing_authority') &&
+          a.status !== 'NOT_FOUND' &&
+          a.value
+      );
+
+      return {
+        id: n.id,
+        fileName: n.fileName,
+        customTitle:
+          n.customTitle ||
+          (titleAttr?.value ? String(titleAttr.value) : undefined) ||
+          n.fileName,
+        issuer: issuerAttr?.value ? String(issuerAttr.value) : undefined,
+        documentType: n.documentType,
+        status: n.status,
+        indexingStatus: n.indexingStatus || 'NOT_INDEXED',
+        pageCount: n.pageCount || 1,
+        createdAt: n.createdAt,
+      };
+    });
   }
 }
-

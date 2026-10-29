@@ -26,7 +26,7 @@ export const SettingsPage: React.FC = () => {
     <div>
       <PageHeader
         title="Account & Privacy Settings"
-        description="Manage your verified profile attributes and control how your document vault operates."
+        description="Manage your profile attributes and control how your document vault operates."
       />
 
       <div style={{ maxWidth: '680px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -43,10 +43,10 @@ export const SettingsPage: React.FC = () => {
               />
 
               <Input
-                label="Verified Institutional Email"
+                label="Institutional Email"
                 value={email}
                 disabled
-                helperText="Email verified through student domain lookup"
+                helperText="Primary account email address"
               />
 
               <Input
@@ -98,13 +98,13 @@ export const SettingsPage: React.FC = () => {
                 htmlFor="shareConsent"
                 style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', lineHeight: 1.4, cursor: 'pointer' }}
               >
-                <strong style={{ color: 'var(--text-primary)' }}>Direct Application Auto-Fill:</strong> Allow Saarthi to securely export verified document attributes directly to official government portal forms when you initiate an application.
+                <strong style={{ color: 'var(--text-primary)' }}>Application Export Preference:</strong> Allow Saarthi to export extracted document attributes when preparing scholarship applications.
               </label>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
               <Shield size={14} style={{ color: 'var(--brand-primary)' }} />
-              <span>Documents are stored in encrypted cold storage and automatically expire after your degree completion.</span>
+              <span>Documents are stored in private server storage accessible only to your authenticated account.</span>
             </div>
           </CardContent>
         </Card>

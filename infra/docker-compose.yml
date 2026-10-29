@@ -1,18 +1,16 @@
-version: '3.8'
-
 services:
   mongodb:
     image: mongo:7.0
     container_name: saarthi-mongodb
     restart: unless-stopped
     ports:
-      - "127.0.0.1:27017:27017"
+      - "127.0.0.1:27018:27017"
     environment:
       MONGO_INITDB_DATABASE: saarthi
     volumes:
       - saarthi-mongodb-data:/data/db
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      test: [ "CMD", "mongosh", "--eval", "db.adminCommand('ping')" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -27,7 +25,7 @@ services:
     volumes:
       - saarthi-redis-data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -50,7 +48,7 @@ services:
     volumes:
       - saarthi-chroma-data:/data/chroma
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -88,7 +86,7 @@ services:
       ai-service:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/health/ready"]
+      test: [ "CMD", "curl", "-f", "http://localhost:5000/health/ready" ]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -99,7 +97,7 @@ services:
       context: ../backend/node-api
       dockerfile: Dockerfile
     container_name: saarthi-worker
-    command: ["node", "dist/worker.js"]
+    command: [ "node", "dist/worker.js" ]
     restart: unless-stopped
     environment:
       NODE_ENV: "production"

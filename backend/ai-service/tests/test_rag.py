@@ -1,6 +1,5 @@
 """Deterministic unit and API tests for RAG indexing, retrieval, and source-grounded answering."""
 
-import io
 import shutil
 import tempfile
 import pytest
@@ -10,18 +9,18 @@ from app.core.config import Settings
 from app.main import app
 from app.rag.chunker import PagePreservingChunker
 from app.rag.embeddings import MockEmbeddingProvider
-from app.rag.generator import DeterministicAnswerGenerator, GeneratorOutput
+from app.rag.generator import DeterministicAnswerGenerator
 from app.rag.models import (
     DocumentChunk,
     RAGQueryRequest,
     RAGStatus,
-    RetrievedChunk,
 )
 from app.rag.rag_service import RAGService
 from app.rag.vector_store import ChromaVectorStore
 from app.services.document_loader import DocumentLoaderService, PageContent
 from app.services.ocr_service import OCRService
 from app.utils.file_validation import DocumentServiceException
+from tests.conftest import create_synthetic_pdf
 
 
 @pytest.fixture
@@ -309,6 +308,58 @@ async def test_rag_rejects_personal_income_certificate_for_indexing(rag_service)
         )
     assert exc_info.value.error_code == "UNSUPPORTED_RAG_DOCUMENT_TYPE"
     assert exc_info.value.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_rag_end_to_end_synthetic_exam_form_pdf(rag_service):
+    """
+    End-to-end regression test (Section 12):
+    Indexes a synthetic exam form PDF with known content via Mode A (allow_personal_document=True),
+    verifies an answerable deadline question returns exact page and snippet citation,
+    and verifies an absent question returns INSUFFICIENT_EVIDENCE without hallucination.
+    """
+    pdf_bytes = create_synthetic_pdf(
+        [
+            "AKTU EXAMINATION FORM 2026\nFull Name of the Applicant : PIYUSH TIWARI\nForm Number: ERN240104855",
+            "IMPORTANT INSTRUCTIONS:\nThe examination form submission deadline is 15 November 2026.\nLate submissions will not be accepted.",
+        ]
+    )
+
+    idx_res = await rag_service.index_document(
+        document_id="exam_form_e2e_01",
+        document_title="AKTU Exam Form 2026",
+        file_bytes=pdf_bytes,
+        file_format="pdf",
+        category="OTHER",
+        allow_personal_document=True,
+    )
+    assert idx_res.status == "INDEXED"
+    assert idx_res.page_count == 2
+    assert idx_res.chunk_count >= 2
+
+    # 1. Ask answerable question on page 2
+    ans_res = await rag_service.query_document(
+        RAGQueryRequest(
+            document_id="exam_form_e2e_01",
+            question="What is the examination form submission deadline?",
+        )
+    )
+    assert ans_res.status == RAGStatus.ANSWERED
+    assert "15 November 2026" in ans_res.answer
+    assert len(ans_res.sources) >= 1
+    assert ans_res.sources[0].document_id == "exam_form_e2e_01"
+    assert ans_res.sources[0].page_number == 2
+    assert "15 November 2026" in ans_res.sources[0].snippet
+
+    # 2. Ask question absent from the PDF
+    unans_res = await rag_service.query_document(
+        RAGQueryRequest(
+            document_id="exam_form_e2e_01",
+            question="What is the hostel mess fee refund policy?",
+        )
+    )
+    assert unans_res.status == RAGStatus.INSUFFICIENT_EVIDENCE
+    assert len(unans_res.sources) == 0
 
 
 # =========================================================================

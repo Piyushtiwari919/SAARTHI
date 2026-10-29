@@ -12,7 +12,8 @@ import asyncio
 import hashlib
 import logging
 import math
-from typing import List, Optional
+import re
+from typing import List
 
 from app.core.config import Settings
 from app.utils.file_validation import DocumentServiceException
@@ -190,9 +191,29 @@ class MockEmbeddingProvider(BaseEmbeddingProvider):
     def dimension(self) -> int:
         return self._dim
 
-    def _generate_vector(self, text: str) -> List[float]:
-        # Generate pseudo-semantic vector from words
-        words = text.lower().split()
+    def _generate_vector(self, text: str, expand_synonyms: bool = False) -> List[float]:
+        words = re.findall(r"\b\w+\b", text.lower())
+        if expand_synonyms:
+            syn_map = {
+                "12": ["xii", "12th"],
+                "12th": ["xii", "12"],
+                "xii": ["12", "12th"],
+                "10": ["x", "10th"],
+                "10th": ["x", "10"],
+                "x": ["10", "10th"],
+                "candidate": ["applicant", "student"],
+                "applicant": ["candidate", "student"],
+                "institution": ["university", "college", "school", "institute"],
+                "university": ["institution", "college", "institute"],
+                "programme": ["course", "bachelor", "technology"],
+                "course": ["programme", "bachelor", "technology"],
+            }
+            extra = []
+            for w in words:
+                if w in syn_map:
+                    extra.extend(syn_map[w])
+            words.extend(extra)
+
         vec = [0.0] * self._dim
 
         for word in words:
@@ -216,8 +237,7 @@ class MockEmbeddingProvider(BaseEmbeddingProvider):
         return vec
 
     async def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        return [self._generate_vector(t) for t in texts]
+        return [self._generate_vector(t, expand_synonyms=False) for t in texts]
 
     async def embed_query(self, text: str) -> List[float]:
-        return self._generate_vector(text)
-
+        return self._generate_vector(text, expand_synonyms=True)

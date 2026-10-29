@@ -2,7 +2,7 @@ import { AppError } from '../../middleware/error-handler.js';
 import { eligibilityRepository, EligibilityRepository } from './eligibility.repository.js';
 import { aggregateEvaluation } from './rule-engine.js';
 import { UserEvidence } from './eligibility.types.js';
-import { IActionItem } from './eligibility-result.model.js';
+import { IActionItem, IEligibilityResultRecord } from './eligibility-result.model.js';
 
 export interface FormattedEligibilityResponse {
   opportunityId: string;
@@ -32,6 +32,37 @@ export interface FormattedEligibilityResponse {
 
 export class EligibilityService {
   constructor(private readonly repo: EligibilityRepository = eligibilityRepository) {}
+
+  private formatRecord(record: IEligibilityResultRecord): FormattedEligibilityResponse {
+    return {
+      opportunityId: record.opportunityId,
+      opportunityTitle: record.opportunityTitle,
+      overallStatus: record.overallStatus,
+      confidenceScore: record.confidenceScore,
+      evaluatedAt:
+        record.evaluatedAt instanceof Date
+          ? record.evaluatedAt.toISOString()
+          : new Date(record.evaluatedAt || Date.now()).toISOString(),
+      summary: record.summary,
+      requirements: (record.requirements || []).map((r) => ({
+        id: r.ruleId,
+        field: r.field,
+        fieldLabel: r.field.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+        operator: r.operator,
+        expectedValue: r.expectedValue,
+        actualValue: r.actualValue,
+        unit: r.unit,
+        status: r.status,
+        explanation: r.reason,
+        sourceDocumentId: r.evidence?.documentId || r.source?.documentId,
+        sourcePage: r.evidence?.page || r.source?.page,
+        evidenceSnippet: r.evidence?.evidenceSnippet || r.source?.evidenceSnippet,
+        isMandatory: true,
+      })),
+      missingDocuments: record.missingDocuments || [],
+      actionItems: record.actionItems || [],
+    };
+  }
 
   public async evaluateOpportunity(
     userId: string,
@@ -157,34 +188,9 @@ export class EligibilityService {
     userId: string,
     opportunityId: string
   ): Promise<FormattedEligibilityResponse> {
-    // If not previously evaluated, run evaluation automatically
     const existing = await this.repo.getResultByUserAndOpportunity(userId, opportunityId);
     if (existing) {
-      return {
-        opportunityId: existing.opportunityId,
-        opportunityTitle: existing.opportunityTitle,
-        overallStatus: existing.overallStatus,
-        confidenceScore: existing.confidenceScore,
-        evaluatedAt: existing.evaluatedAt.toISOString(),
-        summary: existing.summary,
-        requirements: existing.requirements.map((r) => ({
-          id: r.ruleId,
-          field: r.field,
-          fieldLabel: r.field.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
-          operator: r.operator,
-          expectedValue: r.expectedValue,
-          actualValue: r.actualValue,
-          unit: r.unit,
-          status: r.status,
-          explanation: r.reason,
-          sourceDocumentId: r.evidence?.documentId || r.source?.documentId,
-          sourcePage: r.evidence?.page || r.source?.page,
-          evidenceSnippet: r.evidence?.evidenceSnippet || r.source?.evidenceSnippet,
-          isMandatory: true,
-        })),
-        missingDocuments: existing.missingDocuments,
-        actionItems: existing.actionItems,
-      };
+      return this.formatRecord(existing);
     }
 
     return this.evaluateOpportunity(userId, opportunityId);
@@ -201,39 +207,28 @@ export class EligibilityService {
       throw new AppError('Forbidden: Access denied to this evaluation result', 403);
     }
 
-    return {
-      opportunityId: result.opportunityId,
-      opportunityTitle: result.opportunityTitle,
-      overallStatus: result.overallStatus,
-      confidenceScore: result.confidenceScore,
-      evaluatedAt: result.evaluatedAt.toISOString(),
-      summary: result.summary,
-      requirements: result.requirements.map((r) => ({
-        id: r.ruleId,
-        field: r.field,
-        fieldLabel: r.field.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
-        operator: r.operator,
-        expectedValue: r.expectedValue,
-        actualValue: r.actualValue,
-        unit: r.unit,
-        status: r.status,
-        explanation: r.reason,
-        sourceDocumentId: r.evidence?.documentId || r.source?.documentId,
-        sourcePage: r.evidence?.page || r.source?.page,
-        evidenceSnippet: r.evidence?.evidenceSnippet || r.source?.evidenceSnippet,
-        isMandatory: true,
-      })),
-      missingDocuments: result.missingDocuments,
-      actionItems: result.actionItems,
-    };
+    return this.formatRecord(result);
   }
 
+  /**
+   * Returns only existing persisted evaluation results for the user.
+   * Does NOT auto-evaluate opportunities on Dashboard load, ensuring brand-new users
+   * start with 0 evaluations and 0 action items until they explicitly evaluate.
+   */
   public async getAllEligibilitySummaries(userId: string): Promise<FormattedEligibilityResponse[]> {
+    const existingRecords = await this.repo.getEvaluationResultsForUser(userId);
+    return (existingRecords || []).map((rec) => this.formatRecord(rec));
+  }
+
+  /**
+   * Explicitly evaluates all active opportunities against the user's current evidence.
+   */
+  public async evaluateAllOpportunities(userId: string): Promise<FormattedEligibilityResponse[]> {
     const opportunities = await this.repo.getAllActiveOpportunities();
     const results: FormattedEligibilityResponse[] = [];
 
     for (const opp of opportunities) {
-      const res = await this.getEligibilityForOpportunity(userId, opp.opportunityId);
+      const res = await this.evaluateOpportunity(userId, opp.opportunityId);
       results.push(res);
     }
 
@@ -259,4 +254,3 @@ export class EligibilityService {
 }
 
 export const eligibilityService = new EligibilityService();
-

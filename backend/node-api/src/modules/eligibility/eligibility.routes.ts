@@ -6,6 +6,10 @@ export const eligibilityRouter = Router();
 
 eligibilityRouter.use(authenticate);
 
+eligibilityRouter.post('/evaluate-all', (req, res, next) =>
+  eligibilityController.evaluateAllOpportunities(req, res, next)
+);
+
 eligibilityRouter.post('/evaluate', (req, res, next) =>
   eligibilityController.evaluateOpportunity(req, res, next)
 );
@@ -37,4 +41,3 @@ eligibilityRouter.get('/result/:resultId', (req, res, next) =>
 eligibilityRouter.get('/:resultId', (req, res, next) =>
   eligibilityController.getResultById(req, res, next)
 );
-

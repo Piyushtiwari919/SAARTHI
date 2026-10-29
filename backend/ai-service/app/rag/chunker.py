@@ -34,7 +34,8 @@ class PagePreservingChunker:
         """Normalize line breaks, multi-spaces, and strip control characters."""
         if not text:
             return ""
-        # Remove control characters except standard whitespace
+        # Remove control characters except standard whitespace and replace ligatures
+        text = text.replace("\ufb01", "fi").replace("\ufb02", "fl")
         text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", text)
         # Normalize multiple spaces and tabs to single spaces
         text = re.sub(r"[ \t]+", " ", text)
@@ -80,7 +81,7 @@ class PagePreservingChunker:
                     )
                 continue
 
-            # Split text on paragraph boundaries first, then sentence boundaries
+            # Split text on paragraph boundaries first, then sentence/line boundaries
             page_chunks = self._split_page_into_chunks(cleaned)
 
             for idx, chunk_text in enumerate(page_chunks):
@@ -103,7 +104,7 @@ class PagePreservingChunker:
         return all_chunks
 
     def _split_page_into_chunks(self, text: str) -> List[str]:
-        """Split text of a single page using sliding window with paragraph/sentence awareness."""
+        """Split text of a single page using sliding window with paragraph/sentence/line awareness."""
         if len(text) <= self.chunk_size:
             return [text]
 
@@ -116,23 +117,28 @@ class PagePreservingChunker:
             if not para:
                 continue
 
+            if len(para) > self.chunk_size:
+                if current_chunk:
+                    chunks.append(current_chunk.strip())
+                    current_chunk = ""
+                sub_chunks = self._split_sentences(para)
+                if sub_chunks:
+                    chunks.extend(sub_chunks[:-1])
+                    current_chunk = sub_chunks[-1]
+                continue
+
             if not current_chunk:
                 current_chunk = para
             elif len(current_chunk) + len(para) + 2 <= self.chunk_size:
                 current_chunk += "\n\n" + para
             else:
-                # current_chunk is full; flush it
                 chunks.append(current_chunk.strip())
-
-                # If current paragraph itself exceeds chunk_size, split by sentences
-                if len(para) > self.chunk_size:
-                    sub_chunks = self._split_sentences(para)
-                    chunks.extend(sub_chunks[:-1])
-                    current_chunk = sub_chunks[-1] if sub_chunks else ""
-                else:
-                    # Apply overlap from end of previous chunk if useful
-                    overlap_seed = current_chunk[-self.chunk_overlap :] if len(current_chunk) > self.chunk_overlap else ""
-                    current_chunk = f"{overlap_seed} {para}".strip()
+                overlap_seed = (
+                    current_chunk[-self.chunk_overlap :]
+                    if len(current_chunk) > self.chunk_overlap
+                    else ""
+                )
+                current_chunk = f"{overlap_seed} {para}".strip()
 
         if current_chunk and current_chunk.strip():
             chunks.append(current_chunk.strip())
@@ -140,8 +146,8 @@ class PagePreservingChunker:
         return [c for c in chunks if len(c) >= self.min_chunk_length]
 
     def _split_sentences(self, text: str) -> List[str]:
-        """Split long paragraph into smaller sentence-based units."""
-        sentences = re.split(r"(?<=[.!?])\s+", text)
+        """Split long paragraph into smaller sentence or line-based units."""
+        sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+|\n+", text) if s.strip()]
         result: List[str] = []
         curr = ""
 
@@ -149,13 +155,14 @@ class PagePreservingChunker:
             if not curr:
                 curr = s
             elif len(curr) + len(s) + 1 <= self.chunk_size:
-                curr += " " + s
+                curr += "\n" + s
             else:
                 result.append(curr.strip())
-                curr = s
+                # Keep modest overlap between adjacent sub-chunks so multi-line labels stay with values
+                overlap = curr[-self.chunk_overlap :] if len(curr) > self.chunk_overlap else ""
+                curr = f"{overlap}\n{s}".strip() if overlap else s
 
         if curr:
             result.append(curr.strip())
 
         return result
-

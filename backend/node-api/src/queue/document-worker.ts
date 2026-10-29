@@ -1,7 +1,11 @@
 import { Worker, Job } from 'bullmq';
 import { DOCUMENT_QUEUE_NAME, DocumentJobPayload } from './document-queue.js';
 import { getRedisConnectionOptions } from '../config/redis.js';
-import { DocumentModel, IExtractedAttribute } from '../modules/documents/document.model.js';
+import {
+  DocumentModel,
+  IExtractedAttribute,
+  IExtractedEligibilityRule,
+} from '../modules/documents/document.model.js';
 import { getStorageProvider } from '../storage/index.js';
 import { env } from '../config/env.js';
 import { Readable } from 'stream';
@@ -18,7 +22,10 @@ async function streamToBuffer(stream: Readable): Promise<Buffer> {
  * Core processor for document extraction and indexing jobs.
  * Extracted as a pure function for clean testability and bounded retry handling.
  */
-export async function processDocumentJob(data: DocumentJobPayload): Promise<any> {
+export async function processDocumentJob(
+  data: DocumentJobPayload,
+  forceReprocess: boolean = false
+): Promise<any> {
   const { documentId } = data;
 
   // 1. Fetch document from database
@@ -28,8 +35,8 @@ export async function processDocumentJob(data: DocumentJobPayload): Promise<any>
     return { skipped: true, reason: 'DOCUMENT_NOT_FOUND' };
   }
 
-  // 2. Idempotency guard: skip if already processed
-  if (doc.status === 'READY') {
+  // 2. Idempotency guard: skip if already processed unless forceReprocess is true
+  if (doc.status === 'READY' && !forceReprocess) {
     return { skipped: true, reason: 'ALREADY_COMPLETED' };
   }
 
@@ -49,9 +56,8 @@ export async function processDocumentJob(data: DocumentJobPayload): Promise<any>
   const blob = new Blob([buffer], { type: doc.mimeType });
   formData.append('file', blob, doc.fileName);
 
-  // Map category to FastAPI expected document type
-  const docType =
-    doc.documentType === 'SCHOLARSHIP_NOTICE' ? 'SCHOLARSHIP_NOTICE' : 'INCOME_CERTIFICATE';
+  // Pass the actual document category without coercing non-notices to INCOME_CERTIFICATE
+  const docType = doc.documentType || 'OTHER';
   formData.append('document_type', docType);
 
   // 6. Call protected internal FastAPI endpoint
@@ -87,6 +93,7 @@ export async function processDocumentJob(data: DocumentJobPayload): Promise<any>
     // Permanent validation failure (400, 415, 422): mark document FAILED, do not retry
     if ([400, 415, 422].includes(extractResponse.status)) {
       doc.status = 'FAILED';
+      doc.extractionStatus = 'FAILED';
       doc.progressPercent = 100;
       doc.statusMessage = `Processing rejected: ${errMessage}`;
       await doc.save();
@@ -99,24 +106,36 @@ export async function processDocumentJob(data: DocumentJobPayload): Promise<any>
 
   // 8. Parse successful extraction response
   const extractionResult = (await extractResponse.json()) as {
-    processing_status: string;
+    processing_status: 'COMPLETED' | 'NEEDS_REVIEW' | 'FAILED';
     page_count: number;
     extracted_fields: Array<{
       field: string;
       value: unknown;
+      currency?: string;
       confidence?: number;
       source_page?: number;
       evidence_snippet?: string;
       status: string;
     }>;
+    eligibility_rules?: Array<{
+      field: string;
+      operator: string;
+      expected_value: unknown;
+      unit?: string;
+      source_page?: number;
+      evidence_snippet?: string;
+      status?: string;
+    }>;
+    warnings?: string[];
   };
 
-  // 9. Map extracted fields to document schema
+  // 9. Map extracted fields and rules to document schema
   const mappedAttributes: IExtractedAttribute[] = (extractionResult.extracted_fields || []).map(
     (f) => ({
       field: f.field,
       value: (f.value as any) ?? '',
-      confidence: f.confidence,
+      currency: f.currency,
+      confidence: typeof f.confidence === 'number' ? f.confidence : undefined,
       sourcePage: f.source_page,
       evidenceSnippet: f.evidence_snippet,
       status: f.status,
@@ -124,51 +143,71 @@ export async function processDocumentJob(data: DocumentJobPayload): Promise<any>
     })
   );
 
+  const mappedRules: IExtractedEligibilityRule[] = (extractionResult.eligibility_rules || []).map(
+    (r) => ({
+      field: r.field,
+      operator: r.operator,
+      expectedValue: r.expected_value,
+      unit: r.unit,
+      sourcePage: r.source_page,
+      evidenceSnippet: r.evidence_snippet,
+      status: r.status || 'EXTRACTED',
+    })
+  );
+
   doc.extractedAttributes = mappedAttributes;
+  doc.eligibilityRules = mappedRules;
+  doc.warnings = Array.isArray(extractionResult.warnings) ? extractionResult.warnings : [];
+  doc.extractionStatus = extractionResult.processing_status || 'COMPLETED';
   doc.pageCount = extractionResult.page_count || 1;
 
-  // 10. If SCHOLARSHIP_NOTICE, auto-index for RAG Q&A
-  if (doc.documentType === 'SCHOLARSHIP_NOTICE') {
-    try {
-      doc.progressPercent = 75;
-      doc.statusMessage = 'Indexing document passages for Q&A assistant...';
-      await doc.save();
+  // 10. Auto-index document passages for RAG Q&A (supports both Mode A owned docs & Mode B notices)
+  try {
+    const ragFormData = new FormData();
+    const ragBlob = new Blob([buffer], { type: doc.mimeType });
+    ragFormData.append('file', ragBlob, doc.fileName);
+    ragFormData.append('document_id', doc.id);
+    ragFormData.append('document_title', doc.customTitle || doc.fileName);
+    ragFormData.append('category', doc.documentType || 'OTHER');
+    ragFormData.append('allow_personal_document', 'true');
 
-      const ragFormData = new FormData();
-      const ragBlob = new Blob([buffer], { type: doc.mimeType });
-      ragFormData.append('file', ragBlob, doc.fileName);
-      ragFormData.append('document_id', doc.id);
-      ragFormData.append('document_title', doc.customTitle || doc.fileName);
-      ragFormData.append('category', 'SCHOLARSHIP_NOTICE');
+    const ragUrl = `${env.AI_SERVICE_URL}/internal/v1/rag/index`;
+    const ragRes = await fetch(ragUrl, {
+      method: 'POST',
+      headers: {
+        'X-Internal-Service-Token': env.INTERNAL_SERVICE_TOKEN,
+      },
+      body: ragFormData,
+    });
 
-      const ragUrl = `${env.AI_SERVICE_URL}/internal/v1/rag/index`;
-      const ragRes = await fetch(ragUrl, {
-        method: 'POST',
-        headers: {
-          'X-Internal-Service-Token': env.INTERNAL_SERVICE_TOKEN,
-        },
-        body: ragFormData,
-      });
-
-      if (ragRes.ok) {
-        doc.indexingStatus = 'INDEXED';
-      }
-    } catch (ragErr) {
-      console.warn(`[Worker] RAG indexing error for notice ${documentId}:`, ragErr);
-      // Non-fatal for extraction completion
+    if (ragRes && ragRes.ok) {
+      doc.indexingStatus = 'INDEXED';
+    } else if (ragRes) {
+      doc.indexingStatus = 'INDEX_FAILED';
     }
+  } catch (ragErr) {
+    console.warn(`[Worker] RAG indexing error for document ${documentId}:`, ragErr);
+    if (doc.documentType === 'SCHOLARSHIP_NOTICE') {
+      doc.indexingStatus = 'INDEX_FAILED';
+    }
+    // Non-fatal for extraction completion
   }
 
   // 11. Mark document READY
   doc.status = 'READY';
   doc.progressPercent = 100;
-  doc.statusMessage = 'Information extraction completed successfully';
+  doc.statusMessage =
+    doc.extractionStatus === 'NEEDS_REVIEW'
+      ? 'Extraction completed — some fields require review'
+      : 'Information extraction completed successfully';
   await doc.save();
 
   return {
     success: true,
     documentId: doc.id,
-    extractedCount: mappedAttributes.length,
+    extractedCount: mappedAttributes.filter(
+      (a) => a.status !== 'NOT_FOUND' && a.value !== '' && a.value !== null && a.value !== undefined
+    ).length,
   };
 }
 
@@ -198,6 +237,7 @@ export function createDocumentWorker(
       try {
         await DocumentModel.findByIdAndUpdate(job.data.documentId, {
           status: 'FAILED',
+          extractionStatus: 'FAILED',
           statusMessage: `Processing failed after ${job.attemptsMade} attempts: ${err.message}`,
         });
       } catch {
@@ -208,4 +248,3 @@ export function createDocumentWorker(
 
   return worker;
 }
-

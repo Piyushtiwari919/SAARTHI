@@ -10,6 +10,15 @@ class DocumentType(str, Enum):
 
     INCOME_CERTIFICATE = "INCOME_CERTIFICATE"
     SCHOLARSHIP_NOTICE = "SCHOLARSHIP_NOTICE"
+    MARKSHEET = "MARKSHEET"
+    BONAFIDE_CERTIFICATE = "BONAFIDE_CERTIFICATE"
+    DOMICILE_CERTIFICATE = "DOMICILE_CERTIFICATE"
+    CASTE_CERTIFICATE = "CASTE_CERTIFICATE"
+    IDENTITY_PROOF = "IDENTITY_PROOF"
+    BANK_DOCUMENT = "BANK_DOCUMENT"
+    ADMISSION_LETTER = "ADMISSION_LETTER"
+    FEE_RECEIPT = "FEE_RECEIPT"
+    OTHER = "OTHER"
 
 
 class FieldExtractionStatus(str, Enum):
@@ -127,4 +136,3 @@ class ErrorResponse(BaseModel):
         default=None,
         description="Optional non-sensitive context or field validation details",
     )
-
