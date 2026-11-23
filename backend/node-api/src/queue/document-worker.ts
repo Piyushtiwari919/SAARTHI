@@ -83,15 +83,22 @@ export async function processDocumentJob(
   // 7. Handle non-2xx responses from FastAPI
   if (!extractResponse.ok) {
     let errMessage = 'Document extraction failed';
+    let errCode = '';
     try {
       const errData = (await extractResponse.json()) as { message?: string; error_code?: string };
       errMessage = errData.message || errMessage;
+      errCode = errData.error_code || '';
     } catch {
       // fallback
     }
 
-    // Permanent validation failure (400, 415, 422): mark document FAILED, do not retry
-    if ([400, 415, 422].includes(extractResponse.status)) {
+    // Permanent validation or unconfigured engine errors (400, 415, 422, or OCR_ENGINE_UNAVAILABLE / LLM_PROVIDER_UNCONFIGURED):
+    // mark document FAILED immediately so the frontend surfaces the exact reason without hanging in PROCESSING
+    const isPermanentConfigError =
+      extractResponse.status === 503 &&
+      (errCode === 'OCR_ENGINE_UNAVAILABLE' || errCode === 'LLM_PROVIDER_UNCONFIGURED');
+
+    if ([400, 415, 422].includes(extractResponse.status) || isPermanentConfigError) {
       doc.status = 'FAILED';
       doc.extractionStatus = 'FAILED';
       doc.progressPercent = 100;
@@ -100,7 +107,9 @@ export async function processDocumentJob(
       return { failed: true, permanent: true, message: errMessage };
     }
 
-    // Transient server errors (500, 502, 503, 504): throw to trigger BullMQ backoff retry
+    // Transient server errors (500, 502, 503, 504): update statusMessage and throw to trigger BullMQ backoff retry
+    doc.statusMessage = `Retrying after temporary AI service error: ${errMessage}`;
+    await doc.save();
     throw new Error(`FastAPI returned status ${extractResponse.status}: ${errMessage}`);
   }
 

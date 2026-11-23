@@ -192,21 +192,41 @@ class MockEmbeddingProvider(BaseEmbeddingProvider):
         return self._dim
 
     def _generate_vector(self, text: str, expand_synonyms: bool = False) -> List[float]:
-        words = re.findall(r"\b\w+\b", text.lower())
+        normalized_text = re.sub(r"([a-z])([A-Z])", r"\1 \2", text)
+        normalized_text = re.sub(r"\b(No\.|Code)([A-Za-z0-9])", r"\1 \2", normalized_text)
+        words = re.findall(r"\b\w+\b", normalized_text.lower())
         if expand_synonyms:
             syn_map = {
-                "12": ["xii", "12th"],
-                "12th": ["xii", "12"],
-                "xii": ["12", "12th"],
-                "10": ["x", "10th"],
-                "10th": ["x", "10"],
-                "x": ["10", "10th"],
-                "candidate": ["applicant", "student"],
-                "applicant": ["candidate", "student"],
-                "institution": ["university", "college", "school", "institute"],
-                "university": ["institution", "college", "institute"],
-                "programme": ["course", "bachelor", "technology"],
-                "course": ["programme", "bachelor", "technology"],
+                "12": ["xii", "12th", "twelfth"],
+                "12th": ["xii", "12", "twelfth"],
+                "xii": ["12", "12th", "twelfth"],
+                "10": ["x", "10th", "tenth"],
+                "10th": ["x", "10", "tenth"],
+                "x": ["10", "10th", "tenth"],
+                "candidate": ["applicant", "student", "name"],
+                "applicant": ["candidate", "student", "name"],
+                "student": ["applicant", "candidate", "name"],
+                "institution": ["university", "college", "school", "institute", "board", "academy"],
+                "university": ["institution", "college", "institute", "board"],
+                "school": ["institution", "college", "academy", "board"],
+                "programme": ["course", "bachelor", "technology", "branch"],
+                "program": ["course", "bachelor", "technology", "branch"],
+                "course": ["programme", "bachelor", "technology", "branch"],
+                "number": ["no", "num", "code", "id", "form", "roll"],
+                "no": ["number", "num"],
+                "roll": ["no", "number", "registration", "enrollment"],
+                "registration": ["form", "roll", "number", "no"],
+                "form": ["registration", "number", "no", "application"],
+                "certificate": ["cert", "no", "number", "official"],
+                "percentage": ["marks", "score", "cgpa", "grade", "total", "percentile"],
+                "marks": ["percentage", "score", "grade", "total"],
+                "score": ["percentage", "marks", "cgpa", "grade"],
+                "income": ["annual", "family", "revenues", "sources", "rs"],
+                "deadline": ["last", "date", "submission"],
+                "dob": ["date", "birth"],
+                "phone": ["mobile", "number", "contact"],
+                "eligible": ["eligibility", "criteria", "guidelines", "minimum", "norms"],
+                "eligibility": ["eligible", "criteria", "guidelines", "minimum", "norms"],
             }
             extra = []
             for w in words:

@@ -146,8 +146,12 @@ class PagePreservingChunker:
         return [c for c in chunks if len(c) >= self.min_chunk_length]
 
     def _split_sentences(self, text: str) -> List[str]:
-        """Split long paragraph into smaller sentence or line-based units."""
-        sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+|\n+", text) if s.strip()]
+        """Split long paragraph into smaller sentence or line-based units without breaking 'No.' or 'Dr.'."""
+        sentences = [
+            s.strip()
+            for s in re.split(r"(?<!\bNo)(?<!\bDr)(?<!\bMr)(?<!\bMs)(?<!\bRs)(?<!\bSt)(?<=[.!?])\s+|\n+", text)
+            if s.strip()
+        ]
         result: List[str] = []
         curr = ""
 

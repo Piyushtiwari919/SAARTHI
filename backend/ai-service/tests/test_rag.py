@@ -362,6 +362,174 @@ async def test_rag_end_to_end_synthetic_exam_form_pdf(rag_service):
     assert len(unans_res.sources) == 0
 
 
+@pytest.mark.asyncio
+async def test_rag_precision_field_extraction_and_partial_overlap_rejection(rag_service):
+    """
+    Verifies that:
+    1. Exact field questions return the specific field line without dumping unrelated form lines.
+    2. Wrong questions that share partial words with the document (e.g., 'application deadline' vs
+       'Application Number', 'hostel fee' vs 'Fee Payment Status', 'minimum required percentage' vs
+       'Class XII Percentage', 'caste certificate number' vs 'Certificate No.') are strictly rejected
+       with INSUFFICIENT_EVIDENCE.
+    """
+    doc_id = "precision_form_01"
+    chunks = [
+        DocumentChunk(
+            chunk_id="precision_form_01_p1_c0",
+            document_id=doc_id,
+            document_title="AKTU Registration Form",
+            page_number=1,
+            chunk_text=(
+                "Dr. A. P. J. Abdul Kalam Technical University Uttar, Pradesh, Lucknow\n"
+                "Form Number\nERN240104855\n"
+                "Course/Programme Applied for\nBachelor of Technology(Computer Science and Engineering)\n"
+                "Fee Payment Status : Paid\n"
+                "Full Name of the Applicant : PIYUSH TIWARI\n"
+                "Date of Birth : 5 December 2006"
+            ),
+            content_hash="h_p1_c0",
+        ),
+        DocumentChunk(
+            chunk_id="precision_form_01_p1_c1",
+            document_id=doc_id,
+            document_title="AKTU Registration Form",
+            page_number=1,
+            chunk_text=(
+                "Class X\nPercent\nRoll/Registration Number\n73.33\n22176686\n"
+                "Class XII\nPercent\nRoll/Registration Number\n79.60\n22684215"
+            ),
+            content_hash="h_p1_c1",
+        ),
+    ]
+    texts = [c.chunk_text for c in chunks]
+    vecs = await rag_service.embedding_provider.embed_documents(texts)
+    rag_service.vector_store.add_chunks("scholarship_notices", chunks, vecs)
+
+    # Exact answerable field queries
+    q_name = await rag_service.query_document(
+        RAGQueryRequest(document_id=doc_id, question="What is the full name of the applicant?")
+    )
+    assert q_name.status == RAGStatus.ANSWERED
+    assert "PIYUSH TIWARI" in q_name.answer
+    assert "5 December 2006" not in q_name.answer  # Should not dump unrelated lines
+
+    q_xii = await rag_service.query_document(
+        RAGQueryRequest(document_id=doc_id, question="What is the Class XII percentage?")
+    )
+    assert q_xii.status == RAGStatus.ANSWERED
+    assert "79.60%" in q_xii.answer
+    assert "73.33%" not in q_xii.answer
+
+    q_course = await rag_service.query_document(
+        RAGQueryRequest(document_id=doc_id, question="Which course or programme was applied for?")
+    )
+    assert q_course.status == RAGStatus.ANSWERED
+    assert "Bachelor of Technology(Computer Science and Engineering)" in q_course.answer
+
+    # Wrong / unanswerable questions with partial word overlap
+    wrong_questions = [
+        "What is the application deadline?",
+        "What is the family income limit?",
+        "What is the minimum required percentage or score?",
+        "What is the scholarship amount?",
+        "What is the hostel fee?",
+        "What is the caste certificate number?",
+        "What is the bank account number?",
+    ]
+    for wq in wrong_questions:
+        res = await rag_service.query_document(RAGQueryRequest(document_id=doc_id, question=wq))
+        assert res.status == RAGStatus.INSUFFICIENT_EVIDENCE, f"Expected INSUFFICIENT_EVIDENCE for {wq!r}, got {res.answer!r}"
+        assert len(res.sources) == 0
+
+
+@pytest.mark.asyncio
+async def test_rag_short_single_word_field_queries(rag_service):
+    """
+    Verifies that short 1-2 word queries (e.g. 'occupation', 'occupation ?')
+    are not dropped by the vector cosine relevance threshold when the field exists.
+    """
+    doc_id = "short_query_cert_01"
+    chunks = [
+        DocumentChunk(
+            chunk_id="short_query_cert_01_p1_c0",
+            document_id=doc_id,
+            document_title="Income Certificate",
+            page_number=1,
+            chunk_text=(
+                "THE CITADEL OF ELDORIA\n"
+                "Department of Realm Revenues & Household Affairs\n"
+                "OFFICIAL INCOME CERTIFICATE\n"
+                "Certificate No. INC-ELD-302-4781\n"
+                "Name of the Applicant / Head of Household: Lord Eddard of the Northern Reach.\n"
+                "Residential Address: Winterfell Keep, The North\n"
+                "Occupation: Warden of the Northern Marches & Lord of Winterfell.\n"
+                "Annual Income from all sources: 4,800 Gold Dragons."
+            ),
+            content_hash="h_short_1",
+        )
+    ]
+    vecs = await rag_service.embedding_provider.embed_documents([c.chunk_text for c in chunks])
+    rag_service.vector_store.add_chunks("scholarship_notices", chunks, vecs)
+
+    for q in ["occupation", "occupation ?", "certificate number"]:
+        res = await rag_service.query_document(RAGQueryRequest(document_id=doc_id, question=q))
+        assert res.status == RAGStatus.ANSWERED, f"Expected ANSWERED for {q!r}, got {res.status}: {res.answer}"
+    res_occ = await rag_service.query_document(RAGQueryRequest(document_id=doc_id, question="occupation ?"))
+    assert "Warden of the Northern Marches" in res_occ.answer
+
+
+@pytest.mark.asyncio
+async def test_rag_resume_document_qa(rag_service):
+    """
+    Verifies that resume-style documents without explicit 'Name:' labels or colons on section
+    headers answer 'name', 'skills of the person', 'certifications', and 'email or phone number'
+    accurately while rejecting absent questions with INSUFFICIENT_EVIDENCE.
+    """
+    doc_id = "resume_qa_01"
+    chunks = [
+        DocumentChunk(
+            chunk_id="resume_qa_01_p1_c0",
+            document_id=doc_id,
+            document_title="Piyush Resume 2026 Nov",
+            page_number=1,
+            chunk_text=(
+                "Piyush Tiwari\n"
+                "+91 9801649664 | piyushtiwari919921@gmail.com | linkedin.com/in/piyush-tiwari919 | github.com/Piyushtiwari919\n"
+                "Projects\n"
+                "GitKarma | Node.js, Redis, React, BullMQ, MongoDB\n"
+                "Technical Skills\n"
+                "Languages: TypeScript, JavaScript, Python, SQL\n"
+                "Frontend: React.js, Redux Toolkit, Tailwind CSS\n"
+                "Backend & Databases: Node.js, Express.js, FastAPI, MongoDB, Redis,\n"
+                "BullMQ\n"
+                "Certifications: Amazon Web Services (AWS) Certified (Feb 2026)."
+            ),
+            content_hash="h_resume_1",
+        )
+    ]
+    vecs = await rag_service.embedding_provider.embed_documents([c.chunk_text for c in chunks])
+    rag_service.vector_store.add_chunks("scholarship_notices", chunks, vecs)
+
+    r_name = await rag_service.query_document(RAGQueryRequest(document_id=doc_id, question="name"))
+    assert r_name.status == RAGStatus.ANSWERED
+    assert "Piyush Tiwari" in r_name.answer
+
+    r_skills = await rag_service.query_document(RAGQueryRequest(document_id=doc_id, question="skills of the person"))
+    assert r_skills.status == RAGStatus.ANSWERED
+    assert "TypeScript" in r_skills.answer or "Type Script" in r_skills.answer
+    assert "BullMQ" in r_skills.answer or "Bull MQ" in r_skills.answer
+
+    r_contact = await rag_service.query_document(RAGQueryRequest(document_id=doc_id, question="email or phone number"))
+    assert r_contact.status == RAGStatus.ANSWERED
+    assert "9801649664" in r_contact.answer
+    assert "piyushtiwari919921@gmail.com" in r_contact.answer
+
+    for absent_q in ["what is the application deadline?", "what is the family income limit?", "what is the blood group?"]:
+        r_abs = await rag_service.query_document(RAGQueryRequest(document_id=doc_id, question=absent_q))
+        assert r_abs.status == RAGStatus.INSUFFICIENT_EVIDENCE
+        assert len(r_abs.sources) == 0
+
+
 # =========================================================================
 # 4. Internal FastAPI Route Authentication & Integration Tests
 # =========================================================================

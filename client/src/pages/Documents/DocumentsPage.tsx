@@ -69,13 +69,13 @@ export const DocumentsPage: React.FC = () => {
     };
   }, [loadDocuments, selectedDoc]);
 
-  // Polling in real API mode for in-flight processing documents
+  // Fast 2s polling in real API mode whenever any document is in-flight (UPLOADED, QUEUED, PROCESSING)
   useEffect(() => {
     if (USE_MOCKS) return;
 
-    const hasProcessing = documents.some(
-      (d) => d.status !== 'READY' && d.status !== 'FAILED'
-    );
+    const hasProcessing =
+      allDocsCount.some((d) => d.status !== 'READY' && d.status !== 'FAILED') ||
+      documents.some((d) => d.status !== 'READY' && d.status !== 'FAILED');
     if (!hasProcessing) return;
 
     let isSubscribed = true;
@@ -86,13 +86,13 @@ export const DocumentsPage: React.FC = () => {
       } catch (err) {
         console.warn('Background document status refresh error:', err);
       }
-    }, 5000);
+    }, 2000);
 
     return () => {
       isSubscribed = false;
       clearInterval(interval);
     };
-  }, [documents, loadDocuments]);
+  }, [allDocsCount, documents, loadDocuments]);
 
   // Filter counts
   const counts = {

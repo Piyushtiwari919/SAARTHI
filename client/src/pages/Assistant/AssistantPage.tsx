@@ -39,6 +39,22 @@ const NOTICE_SUGGESTED_QUESTIONS = [
   'Who is eligible to apply?',
 ];
 
+const INCOME_CERT_SUGGESTED_QUESTIONS = [
+  'What is the full name of the applicant?',
+  'What is the annual income?',
+  'What is the certificate number?',
+  'What is the date of issue?',
+  'What is the occupation or residential address?',
+];
+
+const MARKSHEET_SUGGESTED_QUESTIONS = [
+  'What is the full name of the applicant?',
+  'What is the roll or certificate number?',
+  'What is the percentage or grade?',
+  'Which institution or board issued this document?',
+  'What is the father name?',
+];
+
 const PERSONAL_DOC_SUGGESTED_QUESTIONS = [
   'What is the full name of the applicant?',
   'What is the form or registration number?',
@@ -136,10 +152,14 @@ export const AssistantPage: React.FC = () => {
     : [];
   const isSelectedReadyForQA =
     selectedNotice?.status === 'READY' && selectedNotice?.indexingStatus === 'INDEXED';
-  const isScholarshipNotice = selectedNotice?.documentType === 'SCHOLARSHIP_NOTICE';
-  const suggestedQuestions = isScholarshipNotice
-    ? NOTICE_SUGGESTED_QUESTIONS
-    : PERSONAL_DOC_SUGGESTED_QUESTIONS;
+  const suggestedQuestions =
+    selectedNotice?.documentType === 'SCHOLARSHIP_NOTICE'
+      ? NOTICE_SUGGESTED_QUESTIONS
+      : selectedNotice?.documentType === 'INCOME_CERTIFICATE'
+        ? INCOME_CERT_SUGGESTED_QUESTIONS
+        : selectedNotice?.documentType === 'MARKSHEET'
+          ? MARKSHEET_SUGGESTED_QUESTIONS
+          : PERSONAL_DOC_SUGGESTED_QUESTIONS;
 
   const handleIndexNotice = async () => {
     if (!selectedNoticeId || isIndexing) return;

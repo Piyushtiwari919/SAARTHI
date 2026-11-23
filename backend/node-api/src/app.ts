@@ -25,7 +25,17 @@ export function createApp(): Express {
 
   app.use(
     cors({
-      origin: [env.CLIENT_URL, 'http://localhost:5173', 'http://127.0.0.1:5173'],
+      origin: (origin, callback) => {
+        if (!origin) return callback(null, true);
+        if (origin === env.CLIENT_URL) return callback(null, true);
+        if (
+          env.NODE_ENV !== 'production' &&
+          /^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/.test(origin)
+        ) {
+          return callback(null, true);
+        }
+        return callback(new Error(`Origin ${origin} not allowed by CORS`));
+      },
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],

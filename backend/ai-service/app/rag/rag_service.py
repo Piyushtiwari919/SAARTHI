@@ -9,6 +9,7 @@ Coordinates:
 """
 
 import logging
+import re
 from typing import List, Optional
 
 from app.core.config import Settings
@@ -194,16 +195,28 @@ class RAGService:
         query_vector = await self.embedding_provider.embed_query(question)
 
         # 3. Retrieve chunks with strict document isolation
+        # Fetch up to max(top_k, 12) chunks within this isolated document so multi-chunk forms never drop header/footer chunks
+        fetch_k = max(top_k, 12)
         retrieved_chunks = self.vector_store.query(
             collection_name=SCHOLARSHIP_COLLECTION,
             query_embedding=query_vector,
-            top_k=top_k,
+            top_k=fetch_k,
             filter_document_id=document_id,
         )
 
-        # 4. Filter by relevance threshold
+        # 4. Filter by relevance threshold, but also retain chunks with direct lexical overlap
+        # so short 1-2 word queries (e.g. "occupation", "occupation ?") are not dropped by bag-of-words cosine dilution.
+        query_terms = {
+            t for t in re.findall(r"\b\w+\b", question.lower()) if len(t) > 2
+        }
         relevant_chunks: List[RetrievedChunk] = [
-            rc for rc in retrieved_chunks if rc.relevance_score >= self.settings.RAG_RELEVANCE_THRESHOLD
+            rc
+            for rc in retrieved_chunks
+            if rc.relevance_score >= self.settings.RAG_RELEVANCE_THRESHOLD
+            or (
+                rc.relevance_score > 0.0
+                and any(t in rc.chunk.chunk_text.lower() for t in query_terms)
+            )
         ]
 
         document_title = (
@@ -211,26 +224,36 @@ class RAGService:
         )
 
         if not relevant_chunks:
-            logger.info("No chunks passed relevance threshold (%.2f) for question", self.settings.RAG_RELEVANCE_THRESHOLD)
-            return RAGQueryResponse(
-                status=RAGStatus.INSUFFICIENT_EVIDENCE,
-                question=question,
-                answer="I could not find sufficient supporting evidence in the selected document for your question.",
-                sources=[],
-                warnings=["No retrieved passages exceeded relevance threshold"],
-                document_id=document_id,
-                document_title=document_title,
-            )
+            if isinstance(self.generator, DeterministicAnswerGenerator) and retrieved_chunks:
+                relevant_chunks = retrieved_chunks
+            else:
+                logger.info("No chunks passed relevance threshold (%.2f) for question", self.settings.RAG_RELEVANCE_THRESHOLD)
+                return RAGQueryResponse(
+                    status=RAGStatus.INSUFFICIENT_EVIDENCE,
+                    question=question,
+                    answer="I could not find sufficient supporting evidence in the selected document for your question.",
+                    sources=[],
+                    warnings=["No retrieved passages exceeded relevance threshold"],
+                    document_id=document_id,
+                    document_title=document_title,
+                )
+
+        candidate_chunks: List[RetrievedChunk] = [
+            rc
+            for rc in retrieved_chunks
+            if rc.relevance_score >= min(self.settings.RAG_RELEVANCE_THRESHOLD, 0.04)
+            or rc in relevant_chunks
+        ]
 
         # 5. Generate grounded answer
         generator_output = await self.generator.generate_answer(
             question=question,
-            retrieved_chunks=relevant_chunks,
+            retrieved_chunks=candidate_chunks,
             document_title=document_title,
         )
 
         # 6. Validate citations against actual retrieved set
-        retrieved_map = {rc.chunk.chunk_id: rc for rc in relevant_chunks}
+        retrieved_map = {rc.chunk.chunk_id: rc for rc in candidate_chunks}
         validated_sources: List[SourceCitation] = []
 
         for cid in generator_output.cited_chunk_ids:
