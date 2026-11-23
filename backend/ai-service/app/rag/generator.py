@@ -303,18 +303,38 @@ class DeterministicAnswerGenerator(BaseAnswerGenerator):
         "scholarship": ("SCHOLARSHIP", {"scholarship", "fellowship", "scheme", "grant", "merit scholarship"}),
         "hostel": ("HOSTEL", {"hostel", "mess", "boarding", "accommodation"}),
         "fee": ("FEE", {"fee", "amount", "tuition"}),
-        # Resume / Portfolio / Profile Sections
-        "skills": ("SKILLS", {"skills", "skill", "technical skills", "languages", "frontend", "backend", "devops"}),
-        "skill": ("SKILLS", {"skills", "skill", "technical skills", "languages", "frontend", "backend", "devops"}),
+        # Resume / Portfolio / Profile Sections & General Document Verbs
+        "skills": ("SKILLS", {"skills", "skill", "technical skills", "languages", "frontend", "backend", "devops", "technologies", "stack"}),
+        "skill": ("SKILLS", {"skills", "skill", "technical skills", "languages", "frontend", "backend", "devops", "technologies", "stack"}),
+        "technologies": ("SKILLS", {"technologies", "technology", "technical skills", "skills", "languages", "frontend", "backend", "devops", "node.js", "react", "python"}),
+        "technology": ("SKILLS", {"technologies", "technology", "technical skills", "skills", "languages", "frontend", "backend", "devops"}),
+        "tech": ("SKILLS", {"tech", "technical skills", "skills", "technologies", "languages", "frontend", "backend"}),
+        "stack": ("SKILLS", {"stack", "technical skills", "skills", "technologies", "languages", "frontend", "backend"}),
+        "languages": ("SKILLS", {"languages", "typescript", "javascript", "python", "c++", "sql"}),
         "projects": ("PROJECTS", {"projects", "project"}),
         "project": ("PROJECTS", {"projects", "project"}),
         "experience": ("EXPERIENCE", {"experience", "work experience", "contributor", "intern", "internship"}),
         "internship": ("EXPERIENCE", {"internship", "intern", "experience", "contributor"}),
+        "work": ("EXPERIENCE", {"work", "experience", "contributor", "intern", "internship"}),
+        "worked": ("EXPERIENCE", {"worked", "work", "experience", "contributor", "intern", "internship"}),
+        "role": ("EXPERIENCE", {"role", "contributor", "intern", "engineer", "experience"}),
         "education": ("EDUCATION", {"education", "bachelor", "master", "college", "university", "institute"}),
-        "achievements": ("ACHIEVEMENTS", {"achievements", "achievement", "hackathons", "hackathon", "competitive programming", "awards"}),
-        "achievement": ("ACHIEVEMENTS", {"achievements", "achievement", "hackathons", "hackathon", "competitive programming", "awards"}),
+        "study": ("EDUCATION", {"study", "education", "bachelor", "master", "college", "university", "institute"}),
+        "studied": ("EDUCATION", {"studied", "study", "education", "bachelor", "master", "college", "university", "institute"}),
+        "degree": ("EDUCATION", {"degree", "bachelor", "master", "b.tech", "education", "programme", "course"}),
+        "achievements": ("ACHIEVEMENTS", {"achievements", "achievement", "hackathons", "hackathon", "competitive programming", "awards", "secured", "runner-up"}),
+        "achievement": ("ACHIEVEMENTS", {"achievements", "achievement", "hackathons", "hackathon", "competitive programming", "awards", "secured", "runner-up"}),
+        "hackathon": ("ACHIEVEMENTS", {"hackathon", "hackathons", "achievements", "secured", "runner-up"}),
+        "hackathons": ("ACHIEVEMENTS", {"hackathon", "hackathons", "achievements", "secured", "runner-up"}),
+        "won": ("ACHIEVEMENTS", {"won", "win", "secured", "runner-up", "place", "award", "awards", "achievements"}),
+        "rank": ("ACHIEVEMENTS", {"rank", "place", "secured", "runner-up", "percentile", "achievements"}),
         "certifications": ("CERTIFICATIONS", {"certifications", "certification", "certified", "certificate"}),
         "certification": ("CERTIFICATIONS", {"certifications", "certification", "certified", "certificate"}),
+        "certified": ("CERTIFICATIONS", {"certified", "certifications", "certification"}),
+        "built": ("ACTION_BUILD", {"built", "build", "created", "developed", "engineered", "architected", "designed", "building"}),
+        "build": ("ACTION_BUILD", {"built", "build", "created", "developed", "engineered", "architected", "designed", "building"}),
+        "created": ("ACTION_BUILD", {"created", "create", "built", "developed", "engineered", "architected", "designed"}),
+        "developed": ("ACTION_BUILD", {"developed", "develop", "developing", "built", "created", "engineered", "architected"}),
         "linkedin": ("LINKEDIN", {"linkedin", "linkedin.com"}),
         "github": ("GITHUB", {"github", "github.com"}),
         # Generic Attribute Containers
@@ -358,7 +378,11 @@ class DeterministicAnswerGenerator(BaseAnswerGenerator):
             text,
         )
         text = re.sub(r"('s)([A-Z])", r"\1 \2", text)
-        text = re.sub(r"([a-z])([A-Z])", r"\1 \2", text)
+        text = re.sub(
+            r"([a-z])(?=(?:No\.|Number|Name|Date|Address|Certificate|Issue|Birth|Status|Total|Percentage|Division|Result|Board|School|Academy|Citadel|Currently)\b)",
+            r"\1 ",
+            text,
+        )
         text = re.sub(r"\b(No\.|Code)([A-Za-z0-9])", r"\1 \2", text)
         text = re.sub(r"([A-Za-z]):([A-Za-z0-9])", r"\1: \2", text)
         text = re.sub(r"([A-Za-z])&([A-Za-z])", r"\1 & \2", text)
@@ -547,6 +571,7 @@ class DeterministicAnswerGenerator(BaseAnswerGenerator):
             "summary": "summary profile",
         }
         current_section = ""
+        current_item_context = ""
         i = 0
         while i < len(lines):
             line = lines[i]
@@ -555,6 +580,7 @@ class DeterministicAnswerGenerator(BaseAnswerGenerator):
             # Track standalone resume/document section headers (e.g. "Technical Skills", "Projects", "Education")
             if line_low in SECTION_HEADER_MAP and ":" not in line:
                 current_section = SECTION_HEADER_MAP[line_low]
+                current_item_context = ""
                 if line_low in ("technical skills", "skills") and i + 1 < len(lines):
                     skill_items: List[str] = []
                     k = i + 1
@@ -772,15 +798,20 @@ class DeterministicAnswerGenerator(BaseAnswerGenerator):
                 sent = sent.strip()
                 if not sent:
                     continue
+                if "|" in sent and not sent.startswith("•"):
+                    current_item_context = sent
+                elif current_section and not sent.startswith("•") and len(sent.split()) <= 6 and ":" not in sent:
+                    current_item_context = f"{current_item_context} {sent}".strip() if current_item_context and len(current_item_context.split()) <= 5 else sent
                 is_primary = is_first_chunk and bool(
                     re.search(r"(?i)\b(?:Form\s*Number|Certificate\s*No|Roll\s*No|Full\s*Name\s*of\s*the\s*Applicant|Name\s*of\s*the\s*Candidate|Name\s*of\s*the\s*Applicant)\b", sent)
                 )
+                ctx_suffix = f"{current_section} {current_item_context.lower()}".strip() if sent.startswith("•") else current_section
                 units.append(
                     StatementUnit(
                         chunk_id=chunk_id,
                         page_number=page_num,
                         display_text=sent,
-                        search_text=f"{sent.lower()} {current_section}".strip(),
+                        search_text=f"{sent.lower()} {ctx_suffix}".strip(),
                         is_unfilled=cls._is_unfilled_value(sent),
                         is_boilerplate=cls._is_boilerplate_line(sent),
                         is_primary_header=is_primary,
@@ -796,10 +827,25 @@ class DeterministicAnswerGenerator(BaseAnswerGenerator):
             return bool(re.search(rf"\b{re.escape(term)}\b", text_lower))
         if term in ("%", "@"):
             return term in text_lower
-        return bool(
+        if (
             re.search(rf"\b{re.escape(term)}", text_lower)
             or re.search(rf"{re.escape(term)}\b", text_lower)
-        )
+        ):
+            return True
+        # Light suffix stemming for natural-language verb/plural variations (e.g. solved/solving, projects/project)
+        if " " not in term and len(term) >= 5:
+            stem = ""
+            if term.endswith("ies"):
+                stem = term[:-3] + "y"
+            elif term.endswith(("ing", "ied")) and len(term) >= 6:
+                stem = term[:-3]
+            elif term.endswith("ed") and len(term) >= 5:
+                stem = term[:-2]
+            elif term.endswith("s") and not term.endswith("ss"):
+                stem = term[:-1]
+            if stem and len(stem) >= 4 and re.search(rf"\b{re.escape(stem)}", text_lower):
+                return True
+        return False
 
     @classmethod
     def _extract_clause_concepts(cls, clause: str) -> Tuple[List[Set[str]], List[Set[str]], Set[str]]:
@@ -819,13 +865,19 @@ class DeterministicAnswerGenerator(BaseAnswerGenerator):
         q_low = re.sub(r"\bis\s+this\s+(?:form|document|certificate|marksheet|notice)\s+from\b", "", q_low)
 
         stop_words = {
-            "what", "is", "the", "for", "are", "which", "who", "where", "how",
-            "many", "much", "a", "an", "to", "of", "in", "and", "this", "that",
-            "do", "does", "was", "were", "selected", "mentioned", "stated", "on",
-            "from", "by", "with", "please", "tell", "me", "about", "give", "show",
-            "can", "you", "find", "my", "his", "her", "their", "its", "applied",
-            "full", "official", "overall", "combined", "family", "annual", "class",
-            "obtained", "required",
+            "what", "is", "the", "for", "are", "which", "who", "whom", "whose",
+            "where", "when", "why", "how", "many", "much", "a", "an", "to", "of",
+            "in", "and", "this", "that", "these", "those", "do", "does", "did",
+            "was", "were", "will", "would", "could", "should", "has", "have", "had",
+            "been", "being", "selected", "mentioned", "stated", "written", "provided",
+            "used", "using", "on", "from", "by", "with", "please", "tell", "me",
+            "about", "give", "show", "list", "explain", "describe", "can", "you",
+            "find", "get", "know", "my", "his", "her", "their", "its", "he", "she",
+            "they", "him", "them", "someone", "anyone", "holder", "owner", "author",
+            "details", "detail", "info", "information", "applied", "full", "official",
+            "overall", "combined", "family", "annual", "class", "obtained", "required",
+            "document", "resume", "cv", "file", "pdf", "image", "page", "any", "some",
+            "summarize", "summary", "overview",
         }
 
         # Handle "X or Y" disjunctive pairs first (e.g. "form or registration", "percentage or score")
@@ -1040,6 +1092,23 @@ class DeterministicAnswerGenerator(BaseAnswerGenerator):
                 valid_clauses = [(a_groups, attr_groups, r_tokens)]
 
         if not valid_clauses:
+            # Handle general overview / summary requests (e.g. "summarize this document", "what is this document about?")
+            if re.search(r"\b(?:summarize|summary|overview|about)\b", question, re.I):
+                primary_units = [u for u in all_units if u.is_primary_header and not u.is_unfilled and not u.is_boilerplate]
+                fallback_units = primary_units[:4] if primary_units else [u for u in all_units if not u.is_unfilled and not u.is_boilerplate][:3]
+                if fallback_units:
+                    summary_displays: List[str] = []
+                    summary_cids: List[str] = []
+                    for u in fallback_units:
+                        if u.display_text not in summary_displays:
+                            summary_displays.append(u.display_text)
+                        if u.chunk_id not in summary_cids:
+                            summary_cids.append(u.chunk_id)
+                    return GeneratorOutput(
+                        status=RAGStatus.ANSWERED,
+                        answer=f"According to {document_title}: " + " | ".join(summary_displays),
+                        cited_chunk_ids=summary_cids[:3],
+                    )
             return GeneratorOutput(
                 status=RAGStatus.INSUFFICIENT_EVIDENCE,
                 answer="I could not find sufficient supporting information in the selected document for your question.",
