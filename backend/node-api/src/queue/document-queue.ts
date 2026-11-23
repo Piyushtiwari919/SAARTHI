@@ -57,7 +57,7 @@ export async function enqueueDocumentJob(
     const queue = getDocumentQueue();
     const jobId = `doc_${documentId}`;
 
-    await queue.add(
+    const addPromise = queue.add(
       'extract-document',
       {
         documentId,
@@ -68,6 +68,17 @@ export async function enqueueDocumentJob(
         jobId, // Idempotent job deduplication by documentId
       }
     );
+
+    if (env.NODE_ENV !== 'test') {
+      await Promise.race([
+        addPromise,
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Redis queue dispatch timed out')), 1500)
+        ),
+      ]);
+    } else {
+      await addPromise;
+    }
 
     // Update document status to QUEUED in database
     await DocumentModel.findByIdAndUpdate(documentId, {

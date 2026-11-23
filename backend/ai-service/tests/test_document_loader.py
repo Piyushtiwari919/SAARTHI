@@ -87,3 +87,9 @@ def test_ocr_empty_text_on_image_raises_invalid_document(test_settings: Settings
     assert exc_info.value.error_code == "INVALID_DOCUMENT"
     assert "No readable text found" in exc_info.value.message
 
+
+
+def test_real_ocr_service_rapidocr_availability(test_settings: Settings):
+    """Verify OCRService detects embedded RapidOCR when external Tesseract binary is absent."""
+    ocr_service = OCRService(test_settings)
+    assert ocr_service.is_available() is True

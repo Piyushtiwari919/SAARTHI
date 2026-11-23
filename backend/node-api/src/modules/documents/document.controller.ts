@@ -4,6 +4,8 @@ import { DocumentService } from './document.service.js';
 import { uploadDocumentBodySchema } from './document.validation.js';
 import { DocumentTypeEnum, DocumentModel } from './document.model.js';
 import { enqueueDocumentJob } from '../../queue/document-queue.js';
+import { processDocumentJob } from '../../queue/document-worker.js';
+import { env } from '../../config/env.js';
 
 // Multer memory storage with 10 MB strict limit
 export const upload = multer({
@@ -39,8 +41,14 @@ export class DocumentController {
         clientMimeType: req.file.mimetype,
       });
 
-      // Dispatch to BullMQ background extraction queue
-      await enqueueDocumentJob(doc.id, `req_${Date.now()}`);
+      // Dispatch to BullMQ background extraction queue (with inline worker fallback if Redis is down)
+      const reqId = `req_${Date.now()}`;
+      const queued = await enqueueDocumentJob(doc.id, reqId);
+      if (!queued && env.ENABLE_BACKGROUND_WORKER && env.NODE_ENV !== 'test') {
+        void processDocumentJob({ documentId: doc.id, processingVersion: 1, requestId: reqId }).catch((err) => {
+          console.error(`[DocumentController] Inline fallback processing failed for ${doc.id}:`, err);
+        });
+      }
 
       res.status(201).json(doc);
     } catch (error) {
